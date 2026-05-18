@@ -1,0 +1,19 @@
+# Germline variant calling rules
+
+[[rules]]
+name = "haplotype_caller"
+input = ["dedup/{sample}.dedup.bam"]
+output = ["germline/{sample}.g.vcf.gz"]
+threads = 4
+description = "Germline variant calling with GATK HaplotypeCaller"
+shell = """
+mkdir -p germline
+gatk HaplotypeCaller \
+    -R {config.reference} \
+    -I {input[0]} \
+    -O {output[0]} \
+    -ERC GVCF \
+    -L {config.target_bed}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"

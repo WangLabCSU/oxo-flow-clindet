@@ -3,7 +3,7 @@
 [[rules]]
 name = "fastp_tumor"
 input = ["{Tumor_R1}", "{Tumor_R2}"]
-output = ["qc/{pair_id}_T_fastp.json", "trimmed/{pair_id}_T_R1.fq.gz", "trimmed/{pair_id}_T_R2.fq.gz"]
+output = ["qc/{pair_id}_T_fastp.json", "trimmed/{pair_id}_T.R1.fq.gz", "trimmed/{pair_id}_T.R2.fq.gz"]
 threads = 8
 description = "Quality control and trimming for tumor sample"
 shell = """
@@ -18,7 +18,7 @@ conda = "envs/clindet.yaml"
 [[rules]]
 name = "fastp_normal"
 input = ["{Normal_R1}", "{Normal_R2}"]
-output = ["qc/{pair_id}_N_fastp.json", "trimmed/{pair_id}_N_R1.fq.gz", "trimmed/{pair_id}_N_R2.fq.gz"]
+output = ["qc/{pair_id}_N_fastp.json", "trimmed/{pair_id}_N.R1.fq.gz", "trimmed/{pair_id}_N.R2.fq.gz"]
 threads = 8
 description = "Quality control and trimming for normal sample"
 shell = """
@@ -27,13 +27,5 @@ fastp -i {input[0]} -I {input[1]} \
       -o {output[1]} -O {output[2]} \
       --json {output[0]} --thread {threads}
 """
-[rules.environment]
-conda = "envs/clindet.yaml"
-
-[[rules]]
-name = "bam_flagstat"
-input = ["aligned/{sample}.sorted.bam"]
-output = ["qc/{sample}.flagstat.txt"]
-shell = "samtools flagstat {input[0]} > {output[0]}"
 [rules.environment]
 conda = "envs/clindet.yaml"

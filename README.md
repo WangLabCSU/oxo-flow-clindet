@@ -1,6 +1,6 @@
-# clindet-oxoflow
+# oxo-flow-clindet-oxoflow
 
-A clinical variant detection pipeline for cancer genomics, ported from [zyllifeworld/clindet](https://github.com/zyllifeworld/clindet) to [oxo-flow](https://github.com/traitome/oxo-flow).
+A clinical variant detection pipeline for cancer genomics, ported from [zyllifeworld/oxo-flow-clindet](https://github.com/zyllifeworld/oxo-flow-clindet) to [oxo-flow](https://github.com/traitome/oxo-flow).
 
 ## Overview
 
@@ -17,7 +17,7 @@ This pipeline performs:
 2. Prepare your `samplesheet.csv`.
 3. Run the pipeline:
    ```bash
-   oxo-flow run clindet.oxoflow
+   oxo-flow run oxo-flow-clindet.oxoflow
    ```
 
 ## Features

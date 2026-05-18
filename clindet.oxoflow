@@ -1,19 +1,24 @@
-# clindet.oxoflow - Ported from zyllifeworld/clindet
-# A clinical variant detection pipeline for cancer genomics.
+# oxo-flow-clindet.oxoflow - Ported from zyllifeworld/clindet
+# A complete clinical variant detection pipeline for cancer genomics.
 
 [workflow]
-name = "clindet"
+name = "oxo-flow-clindet"
 version = "1.0.0"
-description = "Comprehensive clinical variant detection pipeline"
+description = "Comprehensive clinical variant detection pipeline (WES/WGS/RNA)"
 author = "oxo-flow clindet port"
 pairs_file = "samplesheet.csv"
+format_version = "1.0"
 
 [config]
 # Reference genome and resource files
 reference = "mini_test_data/dna/data/hg38_chr21.fa"
 genome_build = "hg38"
+target_bed = "mini_test_data/dna/exome_target_hg38_chr21.bed"
 dbsnp = "mini_test_data/dna/data/dbsnp_146.hg38.vcf.gz"
 known_indels = "mini_test_data/dna/data/Mills_and_1000G.indels.hg38.vcf.gz"
+
+# Software & Data Directories
+vep_cache = "resources/vep_cache"
 star_index = "mini_test_data/rna/star_index"
 rsem_reference = "mini_test_data/rna/rsem_ref"
 amber_loci = "resources/amber_loci.txt"
@@ -24,7 +29,7 @@ ensembl_data_dir = "resources/ensembl"
 threads = 4
 memory = "8G"
 
-# --- INCLUDES ---
+# --- INCLUDES (Modular Sub-Workflows) ---
 [[includes]]
 path = "rules/common/qc.oxoflow"
 
@@ -38,17 +43,26 @@ path = "rules/somatic/filtering.oxoflow"
 path = "rules/somatic/cnv.oxoflow"
 
 [[includes]]
+path = "rules/annotation/vep.oxoflow"
+
+[[includes]]
+path = "rules/report/cancer.oxoflow"
+
+[[includes]]
 path = "rules/rna/expression.oxoflow"
 
-# --- CORE RULES ---
+[[includes]]
+path = "rules/germline/gatk.oxoflow"
 
-# Alignment: BWA-MEM
+# --- CORE ALIGNMENT RULES ---
+
+# Alignment: BWA-MEM for DNA
 [[rules]]
 name = "bwa_align_tumor"
 input = ["{Tumor_R1}", "{Tumor_R2}"]
 output = ["aligned/{pair_id}_T.sorted.bam"]
 threads = 16
-description = "Alignment for tumor sample"
+description = "BWA-MEM alignment for tumor sample"
 shell = """
 mkdir -p aligned
 bwa mem -t {threads} -R '@RG\\tID:{experiment}\\tSM:{experiment}\\tPL:ILLUMINA' \
@@ -64,7 +78,7 @@ name = "bwa_align_normal"
 input = ["{Normal_R1}", "{Normal_R2}"]
 output = ["aligned/{pair_id}_N.sorted.bam"]
 threads = 16
-description = "Alignment for normal sample"
+description = "BWA-MEM alignment for normal sample"
 shell = """
 mkdir -p aligned
 bwa mem -t {threads} -R '@RG\\tID:{control}\\tSM:{control}\\tPL:ILLUMINA' \
@@ -98,20 +112,15 @@ gatk MarkDuplicates -I {input[0]} -O {output[0]} -M {output[1]} --CREATE_INDEX t
 [rules.environment]
 conda = "envs/clindet.yaml"
 
-# Annotation: VEP (Placeholder)
+# --- TARGETS ---
+# This rule defines the final desired outputs for a full run
 [[rules]]
-name = "vep_annotate"
-input = ["variants/merged/{pair_id}.somatic.merged.vcf.gz"]
-output = ["annotated/{pair_id}.annotated.vcf.gz"]
-shell = """
-mkdir -p annotated
-# Placeholder for VEP command
-cp {input[0]} {output[0]} 
-"""
-[rules.environment]
-conda = "envs/clindet.yaml"
-
-[report]
-template = "cancer_report"
-format = ["html", "json"]
-sections = ["summary", "qc", "alignment", "somatic_variants", "provenance"]
+name = "all"
+input = [
+    "reports/{pair_id}.cancer_report.html",
+    "germline/{experiment}.g.vcf.gz",
+    "germline/{control}.g.vcf.gz",
+    "rna/quant/{pair_id}_T.genes.results"
+]
+output = ["final_done_{pair_id}"]
+shell = "touch {output}"
