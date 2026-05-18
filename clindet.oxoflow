@@ -1,0 +1,151 @@
+# clindet.oxoflow - Ported from zyllifeworld/clindet
+# A clinical variant detection pipeline for cancer genomics.
+
+[workflow]
+name = "clindet"
+version = "1.0.0"
+description = "Comprehensive clinical variant detection pipeline"
+author = "oxo-flow clindet port"
+
+[config]
+# Reference genome and resource files
+reference = "mini_test_data/dna/data/hg38_chr21.fa"
+dbsnp = "mini_test_data/dna/data/dbsnp_146.hg38.vcf.gz"
+known_indels = "mini_test_data/dna/data/Mills_and_1000G.indels.hg38.vcf.gz"
+target_bed = "mini_test_data/dna/exome_target_hg38_chr21.bed"
+
+[defaults]
+threads = 4
+memory = "8G"
+
+# Sample Pairing (Tumor/Normal)
+# In a real run, this would be loaded from a pairs_file
+[[pairs]]
+pair_id = "TEST_SAMPLE"
+experiment = "TUMOR"
+control = "NORMAL"
+
+# --- RULES ---
+
+# 1. Preprocessing: FastP QC & Trimming
+[[rules]]
+name = "fastp_tumor"
+input = ["raw/{experiment}_R1.fastq.gz", "raw/{experiment}_R2.fastq.gz"]
+output = ["trimmed/{experiment}_R1.fastq.gz", "trimmed/{experiment}_R2.fastq.gz", "qc/{experiment}_fastp.json"]
+threads = 8
+description = "Quality control and trimming for tumor sample"
+shell = """
+mkdir -p trimmed qc
+fastp -i {input[0]} -I {input[1]} \
+      -o {output[0]} -O {output[1]} \
+      --json {output[2]} --thread {threads}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "fastp_normal"
+input = ["raw/{control}_R1.fastq.gz", "raw/{control}_R2.fastq.gz"]
+output = ["trimmed/{control}_R1.fastq.gz", "trimmed/{control}_R2.fastq.gz", "qc/{control}_fastp.json"]
+threads = 8
+description = "Quality control and trimming for normal sample"
+shell = """
+mkdir -p trimmed qc
+fastp -i {input[0]} -I {input[1]} \
+      -o {output[0]} -O {output[1]} \
+      --json {output[2]} --thread {threads}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# 2. Alignment: BWA-MEM
+[[rules]]
+name = "bwa_align_tumor"
+input = ["trimmed/{experiment}_R1.fastq.gz", "trimmed/{experiment}_R2.fastq.gz"]
+output = ["aligned/{experiment}.sorted.bam"]
+threads = 16
+description = "Alignment for tumor sample"
+shell = """
+mkdir -p aligned
+bwa mem -t {threads} -R '@RG\\tID:{experiment}\\tSM:{experiment}\\tPL:ILLUMINA' \
+    {config.reference} {input[0]} {input[1]} \
+    | samtools sort -@ 4 -o {output[0]}
+samtools index {output[0]}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "bwa_align_normal"
+input = ["trimmed/{control}_R1.fastq.gz", "trimmed/{control}_R2.fastq.gz"]
+output = ["aligned/{control}.sorted.bam"]
+threads = 16
+description = "Alignment for normal sample"
+shell = """
+mkdir -p aligned
+bwa mem -t {threads} -R '@RG\\tID:{control}\\tSM:{control}\\tPL:ILLUMINA' \
+    {config.reference} {input[0]} {input[1]} \
+    | samtools sort -@ 4 -o {output[0]}
+samtools index {output[0]}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# 3. Post-Alignment: MarkDuplicates
+[[rules]]
+name = "mark_duplicates_tumor"
+input = ["aligned/{experiment}.sorted.bam"]
+output = ["dedup/{experiment}.dedup.bam", "dedup/{experiment}.metrics.txt"]
+shell = """
+mkdir -p dedup
+gatk MarkDuplicates -I {input[0]} -O {output[0]} -M {output[1]} --CREATE_INDEX true
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "mark_duplicates_normal"
+input = ["aligned/{control}.sorted.bam"]
+output = ["dedup/{control}.dedup.bam", "dedup/{control}.metrics.txt"]
+shell = """
+mkdir -p dedup
+gatk MarkDuplicates -I {input[0]} -O {output[0]} -M {output[1]} --CREATE_INDEX true
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# 4. Variant Calling: Mutect2 (Somatic)
+[[rules]]
+name = "mutect2"
+input = ["dedup/{experiment}.dedup.bam", "dedup/{control}.dedup.bam"]
+output = ["variants/{pair_id}.mutect2.vcf.gz"]
+threads = 4
+description = "Somatic variant calling with Mutect2"
+shell = """
+mkdir -p variants
+gatk Mutect2 -R {config.reference} \
+    -I {input[0]} -tumor {experiment} \
+    -I {input[1]} -normal {control} \
+    -L {config.target_bed} \
+    -O {output[0]}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# 5. Annotation: VEP (Placeholder)
+[[rules]]
+name = "vep_annotate"
+input = ["variants/{pair_id}.mutect2.vcf.gz"]
+output = ["annotated/{pair_id}.annotated.vcf.gz"]
+shell = """
+mkdir -p annotated
+# Placeholder for VEP command
+cp {input[0]} {output[0]} 
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[report]
+template = "cancer_report"
+format = ["html", "json"]
+sections = ["summary", "qc", "alignment", "somatic_variants", "provenance"]

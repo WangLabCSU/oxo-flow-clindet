@@ -1,0 +1,13 @@
+name: clindet
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bwa=0.7.18
+  - samtools=1.20
+  - fastp=0.23.4
+  - gatk4=4.5.0.0
+  - picard=3.2.0
+  - python=3.11
+  - snakemake=8.10.0
