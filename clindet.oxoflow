@@ -11,50 +11,41 @@ pairs_file = "samplesheet.csv"
 [config]
 # Reference genome and resource files
 reference = "mini_test_data/dna/data/hg38_chr21.fa"
+genome_build = "hg38"
 dbsnp = "mini_test_data/dna/data/dbsnp_146.hg38.vcf.gz"
 known_indels = "mini_test_data/dna/data/Mills_and_1000G.indels.hg38.vcf.gz"
+star_index = "mini_test_data/rna/star_index"
+rsem_reference = "mini_test_data/rna/rsem_ref"
+amber_loci = "resources/amber_loci.txt"
+gc_profile = "resources/gc_profile.pcf"
+ensembl_data_dir = "resources/ensembl"
 
 [defaults]
 threads = 4
 memory = "8G"
 
-# --- RULES ---
+# --- INCLUDES ---
+[[includes]]
+path = "rules/common/qc.oxoflow"
 
-# 1. Preprocessing: FastP QC & Trimming
-[[rules]]
-name = "fastp_tumor"
-input = ["{Tumor_R1}", "{Tumor_R2}"]
-output = ["qc/{pair_id}_T_fastp.json", "trimmed/{pair_id}_T_R1.fq.gz", "trimmed/{pair_id}_T_R2.fq.gz"]
-threads = 8
-description = "Quality control and trimming for tumor sample"
-shell = """
-mkdir -p trimmed qc
-fastp -i {input[0]} -I {input[1]} \
-      -o {output[1]} -O {output[2]} \
-      --json {output[0]} --thread {threads}
-"""
-[rules.environment]
-conda = "envs/clindet.yaml"
+[[includes]]
+path = "rules/somatic/callers.oxoflow"
 
-[[rules]]
-name = "fastp_normal"
-input = ["{Normal_R1}", "{Normal_R2}"]
-output = ["qc/{pair_id}_N_fastp.json", "trimmed/{pair_id}_N_R1.fq.gz", "trimmed/{pair_id}_N_R2.fq.gz"]
-threads = 8
-description = "Quality control and trimming for normal sample"
-shell = """
-mkdir -p trimmed qc
-fastp -i {input[0]} -I {input[1]} \
-      -o {output[1]} -O {output[2]} \
-      --json {output[0]} --thread {threads}
-"""
-[rules.environment]
-conda = "envs/clindet.yaml"
+[[includes]]
+path = "rules/somatic/filtering.oxoflow"
 
-# 2. Alignment: BWA-MEM
+[[includes]]
+path = "rules/somatic/cnv.oxoflow"
+
+[[includes]]
+path = "rules/rna/expression.oxoflow"
+
+# --- CORE RULES ---
+
+# Alignment: BWA-MEM
 [[rules]]
 name = "bwa_align_tumor"
-input = ["trimmed/{pair_id}_T_R1.fq.gz", "trimmed/{pair_id}_T_R2.fq.gz"]
+input = ["{Tumor_R1}", "{Tumor_R2}"]
 output = ["aligned/{pair_id}_T.sorted.bam"]
 threads = 16
 description = "Alignment for tumor sample"
@@ -70,7 +61,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "bwa_align_normal"
-input = ["trimmed/{pair_id}_N_R1.fq.gz", "trimmed/{pair_id}_N_R2.fq.gz"]
+input = ["{Normal_R1}", "{Normal_R2}"]
 output = ["aligned/{pair_id}_N.sorted.bam"]
 threads = 16
 description = "Alignment for normal sample"
@@ -84,7 +75,7 @@ samtools index {output[0]}
 [rules.environment]
 conda = "envs/clindet.yaml"
 
-# 3. Post-Alignment: MarkDuplicates
+# Post-Alignment: MarkDuplicates
 [[rules]]
 name = "mark_duplicates_tumor"
 input = ["aligned/{pair_id}_T.sorted.bam"]
@@ -107,28 +98,10 @@ gatk MarkDuplicates -I {input[0]} -O {output[0]} -M {output[1]} --CREATE_INDEX t
 [rules.environment]
 conda = "envs/clindet.yaml"
 
-# 4. Variant Calling: Mutect2 (Somatic)
-[[rules]]
-name = "mutect2"
-input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
-output = ["variants/{pair_id}.mutect2.vcf.gz"]
-threads = 4
-description = "Somatic variant calling with Mutect2"
-shell = """
-mkdir -p variants
-gatk Mutect2 -R {config.reference} \
-    -I {input[0]} -tumor {experiment} \
-    -I {input[1]} -normal {control} \
-    -L {Target_BED} \
-    -O {output[0]}
-"""
-[rules.environment]
-conda = "envs/clindet.yaml"
-
-# 5. Annotation: VEP (Placeholder)
+# Annotation: VEP (Placeholder)
 [[rules]]
 name = "vep_annotate"
-input = ["variants/{pair_id}.mutect2.vcf.gz"]
+input = ["variants/merged/{pair_id}.somatic.merged.vcf.gz"]
 output = ["annotated/{pair_id}.annotated.vcf.gz"]
 shell = """
 mkdir -p annotated

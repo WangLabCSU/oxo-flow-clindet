@@ -1,0 +1,29 @@
+# RNA-seq pipeline rules
+
+[[rules]]
+name = "star_align"
+input = ["trimmed/{sample}_R1.fq.gz", "trimmed/{sample}_R2.fq.gz"]
+output = ["rna/aligned/{sample}.Aligned.sortedByCoord.out.bam"]
+threads = 12
+shell = """
+STAR --runThreadN {threads} \
+     --genomeDir {config.star_index} \
+     --readFilesIn {input[0]} {input[1]} \
+     --readFilesCommand zcat \
+     --outFileNamePrefix rna/aligned/{sample}. \
+     --outSAMtype BAM SortedByCoordinate
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "rsem_calculate_expression"
+input = ["rna/aligned/{sample}.Aligned.toTranscriptome.out.bam"]
+output = ["rna/quant/{sample}.genes.results", "rna/quant/{sample}.isoforms.results"]
+threads = 8
+shell = """
+rsem-calculate-expression --bam --paired-end \
+    -p {threads} {input[0]} {config.rsem_reference} rna/quant/{sample}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
