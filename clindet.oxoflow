@@ -6,54 +6,47 @@ name = "clindet"
 version = "1.0.0"
 description = "Comprehensive clinical variant detection pipeline"
 author = "oxo-flow clindet port"
+pairs_file = "samplesheet.csv"
 
 [config]
 # Reference genome and resource files
 reference = "mini_test_data/dna/data/hg38_chr21.fa"
 dbsnp = "mini_test_data/dna/data/dbsnp_146.hg38.vcf.gz"
 known_indels = "mini_test_data/dna/data/Mills_and_1000G.indels.hg38.vcf.gz"
-target_bed = "mini_test_data/dna/exome_target_hg38_chr21.bed"
 
 [defaults]
 threads = 4
 memory = "8G"
-
-# Sample Pairing (Tumor/Normal)
-# In a real run, this would be loaded from a pairs_file
-[[pairs]]
-pair_id = "TEST_SAMPLE"
-experiment = "TUMOR"
-control = "NORMAL"
 
 # --- RULES ---
 
 # 1. Preprocessing: FastP QC & Trimming
 [[rules]]
 name = "fastp_tumor"
-input = ["raw/{experiment}_R1.fastq.gz", "raw/{experiment}_R2.fastq.gz"]
-output = ["trimmed/{experiment}_R1.fastq.gz", "trimmed/{experiment}_R2.fastq.gz", "qc/{experiment}_fastp.json"]
+input = ["{Tumor_R1}", "{Tumor_R2}"]
+output = ["qc/{pair_id}_T_fastp.json", "trimmed/{pair_id}_T_R1.fq.gz", "trimmed/{pair_id}_T_R2.fq.gz"]
 threads = 8
 description = "Quality control and trimming for tumor sample"
 shell = """
 mkdir -p trimmed qc
 fastp -i {input[0]} -I {input[1]} \
-      -o {output[0]} -O {output[1]} \
-      --json {output[2]} --thread {threads}
+      -o {output[1]} -O {output[2]} \
+      --json {output[0]} --thread {threads}
 """
 [rules.environment]
 conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "fastp_normal"
-input = ["raw/{control}_R1.fastq.gz", "raw/{control}_R2.fastq.gz"]
-output = ["trimmed/{control}_R1.fastq.gz", "trimmed/{control}_R2.fastq.gz", "qc/{control}_fastp.json"]
+input = ["{Normal_R1}", "{Normal_R2}"]
+output = ["qc/{pair_id}_N_fastp.json", "trimmed/{pair_id}_N_R1.fq.gz", "trimmed/{pair_id}_N_R2.fq.gz"]
 threads = 8
 description = "Quality control and trimming for normal sample"
 shell = """
 mkdir -p trimmed qc
 fastp -i {input[0]} -I {input[1]} \
-      -o {output[0]} -O {output[1]} \
-      --json {output[2]} --thread {threads}
+      -o {output[1]} -O {output[2]} \
+      --json {output[0]} --thread {threads}
 """
 [rules.environment]
 conda = "envs/clindet.yaml"
@@ -61,8 +54,8 @@ conda = "envs/clindet.yaml"
 # 2. Alignment: BWA-MEM
 [[rules]]
 name = "bwa_align_tumor"
-input = ["trimmed/{experiment}_R1.fastq.gz", "trimmed/{experiment}_R2.fastq.gz"]
-output = ["aligned/{experiment}.sorted.bam"]
+input = ["trimmed/{pair_id}_T_R1.fq.gz", "trimmed/{pair_id}_T_R2.fq.gz"]
+output = ["aligned/{pair_id}_T.sorted.bam"]
 threads = 16
 description = "Alignment for tumor sample"
 shell = """
@@ -77,8 +70,8 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "bwa_align_normal"
-input = ["trimmed/{control}_R1.fastq.gz", "trimmed/{control}_R2.fastq.gz"]
-output = ["aligned/{control}.sorted.bam"]
+input = ["trimmed/{pair_id}_N_R1.fq.gz", "trimmed/{pair_id}_N_R2.fq.gz"]
+output = ["aligned/{pair_id}_N.sorted.bam"]
 threads = 16
 description = "Alignment for normal sample"
 shell = """
@@ -94,8 +87,8 @@ conda = "envs/clindet.yaml"
 # 3. Post-Alignment: MarkDuplicates
 [[rules]]
 name = "mark_duplicates_tumor"
-input = ["aligned/{experiment}.sorted.bam"]
-output = ["dedup/{experiment}.dedup.bam", "dedup/{experiment}.metrics.txt"]
+input = ["aligned/{pair_id}_T.sorted.bam"]
+output = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_T.metrics.txt"]
 shell = """
 mkdir -p dedup
 gatk MarkDuplicates -I {input[0]} -O {output[0]} -M {output[1]} --CREATE_INDEX true
@@ -105,8 +98,8 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "mark_duplicates_normal"
-input = ["aligned/{control}.sorted.bam"]
-output = ["dedup/{control}.dedup.bam", "dedup/{control}.metrics.txt"]
+input = ["aligned/{pair_id}_N.sorted.bam"]
+output = ["dedup/{pair_id}_N.dedup.bam", "dedup/{pair_id}_N.metrics.txt"]
 shell = """
 mkdir -p dedup
 gatk MarkDuplicates -I {input[0]} -O {output[0]} -M {output[1]} --CREATE_INDEX true
@@ -117,7 +110,7 @@ conda = "envs/clindet.yaml"
 # 4. Variant Calling: Mutect2 (Somatic)
 [[rules]]
 name = "mutect2"
-input = ["dedup/{experiment}.dedup.bam", "dedup/{control}.dedup.bam"]
+input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
 output = ["variants/{pair_id}.mutect2.vcf.gz"]
 threads = 4
 description = "Somatic variant calling with Mutect2"
@@ -126,7 +119,7 @@ mkdir -p variants
 gatk Mutect2 -R {config.reference} \
     -I {input[0]} -tumor {experiment} \
     -I {input[1]} -normal {control} \
-    -L {config.target_bed} \
+    -L {Target_BED} \
     -O {output[0]}
 """
 [rules.environment]

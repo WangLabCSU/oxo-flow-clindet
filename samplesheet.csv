@@ -1,0 +1,2 @@
+pair_id,tumor,normal,Tumor_R1,Tumor_R2,Normal_R1,Normal_R2,Target_BED
+CASE001,TUMOR_001,NORMAL_001,mini_test_data/dna/data/T_R1.fq.gz,mini_test_data/dna/data/T_R2.fq.gz,mini_test_data/dna/data/N_R1.fq.gz,mini_test_data/dna/data/N_R2.fq.gz,mini_test_data/dna/exome_target_hg38_chr21.bed
