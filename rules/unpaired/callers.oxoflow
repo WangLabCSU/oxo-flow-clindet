@@ -1,0 +1,14 @@
+# Unpaired (Tumor-only) variant calling rules
+
+[[rules]]
+name = "mutect2_unpaired"
+input = ["dedup/{sample}.dedup.bam"]
+output = ["variants/unpaired/{sample}.mutect2.vcf.gz"]
+shell = """
+mkdir -p variants/unpaired
+gatk Mutect2 -R {config.reference} -I {input[0]} \
+    -O {output[0]} --germline-resource {config.gnomad} \
+    --panel-of-normals {config.pon}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"

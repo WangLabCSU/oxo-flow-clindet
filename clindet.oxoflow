@@ -16,6 +16,8 @@ genome_build = "hg38"
 target_bed = "mini_test_data/dna/exome_target_hg38_chr21.bed"
 dbsnp = "mini_test_data/dna/data/dbsnp_146.hg38.vcf.gz"
 known_indels = "mini_test_data/dna/data/Mills_and_1000G.indels.hg38.vcf.gz"
+gnomad = "resources/gnomad.vcf.gz"
+pon = "resources/pon.vcf.gz"
 
 # Software & Data Directories
 vep_cache = "resources/vep_cache"
@@ -37,10 +39,19 @@ path = "rules/common/qc.oxoflow"
 path = "rules/somatic/callers.oxoflow"
 
 [[includes]]
+path = "rules/somatic/extended_callers.oxoflow"
+
+[[includes]]
 path = "rules/somatic/filtering.oxoflow"
 
 [[includes]]
 path = "rules/somatic/cnv.oxoflow"
+
+[[includes]]
+path = "rules/sv/callers.oxoflow"
+
+[[includes]]
+path = "rules/unpaired/callers.oxoflow"
 
 [[includes]]
 path = "rules/annotation/vep.oxoflow"
@@ -120,7 +131,8 @@ input = [
     "reports/{pair_id}.cancer_report.html",
     "germline/{experiment}.g.vcf.gz",
     "germline/{control}.g.vcf.gz",
-    "rna/quant/{pair_id}_T.genes.results"
+    "sv/gridss/{pair_id}.vcf.gz",
+    "variants/unpaired/{experiment}.mutect2.vcf.gz"
 ]
 output = ["final_done_{pair_id}"]
 shell = "touch {output}"

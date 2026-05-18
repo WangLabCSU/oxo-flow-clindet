@@ -1,0 +1,39 @@
+# Structural Variant (SV) detection rules
+
+[[rules]]
+name = "manta"
+input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
+output = ["sv/manta/{pair_id}/results/variants/somaticSV.vcf.gz"]
+threads = 12
+shell = """
+configManta.py --tumorBam {input[0]} --normalBam {input[1]} \
+    --referenceFasta {config.reference} \
+    --runDir sv/manta/{pair_id}
+sv/manta/{pair_id}/runWorkflow.py -m local -j {threads}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "delly"
+input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
+output = ["sv/delly/{pair_id}.somatic.bcf"]
+shell = """
+delly call -g {config.reference} -o sv/delly/{pair_id}.bcf {input[0]} {input[1]}
+delly filter -f somatic -o {output[0]} sv/delly/{pair_id}.bcf
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "gridss"
+input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
+output = ["sv/gridss/{pair_id}.vcf.gz"]
+threads = 16
+shell = """
+gridss -r {config.reference} -o {output[0]} \
+    -b {config.target_bed} -t {threads} \
+    {input[0]} {input[1]}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"

@@ -1,0 +1,36 @@
+# Extended Somatic SNV callers
+
+[[rules]]
+name = "lofreq"
+input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
+output = ["variants/{pair_id}.lofreq.vcf.gz"]
+threads = 8
+shell = """
+lofreq somatic -n {input[1]} -t {input[0]} -f {config.reference} \
+    -o variants/lofreq_{pair_id}/ --threads {threads}
+cp variants/lofreq_{pair_id}/somatic_final.snvs.vcf.gz {output[0]}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "muse"
+input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
+output = ["variants/{pair_id}.muse.vcf.gz"]
+shell = """
+MuSE call -f {config.reference} -O variants/{pair_id}.muse {input[0]} {input[1]}
+MuSE sump -I variants/{pair_id}.muse.MuSE.txt -E -O {output[0]} -D {config.dbsnp}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2"
+input = ["dedup/{pair_id}_T.dedup.bam", "dedup/{pair_id}_N.dedup.bam"]
+output = ["variants/{pair_id}.varscan2.vcf.gz"]
+shell = """
+samtools mpileup -f {config.reference} {input[1]} {input[0]} | \
+    java -jar VarScan.jar somatic --output-vcf 1 --output-snp {output[0]}
+"""
+[rules.environment]
+conda = "envs/clindet.yaml"
