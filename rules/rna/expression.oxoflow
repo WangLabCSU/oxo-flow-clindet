@@ -1,29 +1,57 @@
-# RNA-seq pipeline rules
+# RNA-seq pipeline rules ported with high fidelity
 
 [[rules]]
-name = "star_align"
-input = ["trimmed/{sample}_R1.fq.gz", "trimmed/{sample}_R2.fq.gz"]
-output = ["rna/aligned/{sample}.Aligned.sortedByCoord.out.bam"]
-threads = 12
+name = "star_arriba_map"
+input = ["{Tumor_R1}", "{Tumor_R2}"]
+output = [
+    "rna/aligned/{pair_id}_T.sorted.bam",
+    "rna/aligned/{pair_id}_T_star.log",
+    "rna/unmapped/{pair_id}_T_R1.fq",
+    "rna/unmapped/{pair_id}_T_R2.fq"
+]
+threads = 10
 shell = """
-STAR --runThreadN {threads} \
-     --genomeDir {config.star_index} \
-     --readFilesIn {input[0]} {input[1]} \
-     --readFilesCommand zcat \
-     --outFileNamePrefix rna/aligned/{sample}. \
-     --outSAMtype BAM SortedByCoordinate
+STAR --genomeDir {config.star_index} --runThreadN {threads} \
+    --outSAMtype BAM Unsorted --outFileNamePrefix rna/aligned/{pair_id}_T_ \
+    --outReadsUnmapped Fastx \
+    --sjdbGTFfile {config.gtf} \
+    --outFilterMultimapNmax 50 \
+    --peOverlapNbasesMin 10 \
+    --alignSplicedMateMapLminOverLmate 0.5 \
+    --alignSJstitchMismatchNmax 5 -1 5 5 \
+    --chimSegmentMin 10 \
+    --chimOutType WithinBAM HardClip \
+    --chimJunctionOverhangMin 10 \
+    --chimScoreDropMax 30 \
+    --chimScoreJunctionNonGTAG 0 \
+    --chimScoreSeparation 1 \
+    --chimSegmentReadGapMax 3 \
+    --chimMultimapNmax 50 \
+    --readFilesIn {input[0]} {input[1]} --readFilesCommand gunzip -c
+
+samtools sort -@ {threads} -m 1G -o {output[0]} rna/aligned/{pair_id}_T_Aligned.out.bam
+samtools index {output[0]}
+mv rna/aligned/{pair_id}_T_Unmapped.out.mate1 {output[2]}
+mv rna/aligned/{pair_id}_T_Unmapped.out.mate2 {output[3]}
+touch {output[1]}
 """
 [rules.environment]
 conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "rsem_calculate_expression"
-input = ["rna/aligned/{sample}.Aligned.toTranscriptome.out.bam"]
-output = ["rna/quant/{sample}.genes.results", "rna/quant/{sample}.isoforms.results"]
-threads = 8
+input = ["{Tumor_R1}", "{Tumor_R2}"]
+output = [
+    "rna/quant/{pair_id}_T.genes.results",
+    "rna/quant/{pair_id}_T.isoforms.results"
+]
+threads = 10
 shell = """
-rsem-calculate-expression --bam --paired-end \
-    -p {threads} {input[0]} {config.rsem_reference} rna/quant/{sample}
+rsem-calculate-expression --paired-end \
+    --star -p {threads} --star-output-genome-bam \
+    --star-gzipped-read-file --sort-bam-by-coordinate \
+    {input[0]} {input[1]} \
+    {config.rsem_reference} rna/quant/{pair_id}_T
 """
 [rules.environment]
 conda = "envs/clindet.yaml"
