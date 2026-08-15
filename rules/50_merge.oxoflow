@@ -1,0 +1,59 @@
+# MAF merge + mutation flagging, ported verbatim from upstream
+# workflow/common/rules/merge_loop.smk + mutation_flag.smk.
+# Upstream R scripts talk to Snakemake through the `snakemake` S4 object;
+# the port drives the verbatim scripts through scripts/smk.R, a small shim
+# that builds that object from CLI flags (see scripts/smk.R).
+
+[workflow]
+name = "merge"
+
+# ------------------------------------------------------- somatic MAF merge ----
+[[rules]]
+name = "merge_paired_maf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.somatic_caller_list", pair_id = "config.pair_ids" } }
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf" ]
+description = "merge per-caller MAFs (upstream merge_paired_maf + merge_maf.R)"
+shell = """Rscript scripts/smk.R --script scripts/merge_maf.R --input maf1 {input} --param dir {config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id} --output maf {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------ germline MAF merge ----
+[[rules]]
+name = "merge_paired_germ_maf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.germ_caller_list", pair_id = "config.pair_ids" } }
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/merge/{pair_id}.maf" ]
+description = "merge germline per-caller MAFs (upstream merge_paired_germ_maf + merge_maf.R)"
+shell = """Rscript scripts/smk.R --script scripts/merge_maf.R --input maf1 {input} --param dir {config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id} --output maf {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------- mutation flagging ----
+[[rules]]
+name = "make_region_bed_list"
+input = []
+output = [ "{config.output_dir}/{config.genome_version}/results/bed_list.tsv" ]
+description = "write BED track list for mutation flagging (upstream make_region_bed_list; annotate_beds config -> name/path TSV)"
+shell = """if [ -s "{config.annotate_beds_file}" ]; then
+    cp "{config.annotate_beds_file}" "{output[0]}"
+else
+    printf 'name\\tpath\\n' > "{output[0]}"
+fi"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "flag_mutation_pairead_maf"
+input = {
+    maf = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf",
+    bed_list = "{config.output_dir}/{config.genome_version}/results/bed_list.tsv"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.maf" ]
+log = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.log"
+description = "flag MAF variants against region BED tracks (upstream flag_mutation_pairead_maf + flag_mutation_maf.R)"
+shell = """Rscript scripts/smk.R --script scripts/flag_mutation_maf.R --input maf {input.maf} --input bed_list {input.bed_list} --param genome_version {config.genome_version} --param chr_col Chromosome --param start_col Start_Position --param end_col End_Position --param keep_chr_prefix FALSE --param ignore_strand TRUE --param max_region_labels 10 --output maf {output[0]} --log log {config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.log"""
+[rules.environment]
+conda = "envs/clindet_mut.yaml"

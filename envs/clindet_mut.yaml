@@ -1,0 +1,17 @@
+# Ported verbatim from upstream envs/clindet_mut.yaml.
+name: clindet_mutflag
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base
+  - r-tidyverse
+  - r-data.table
+  - r-optparse
+  - bioconductor-genomicranges
+  - bioconductor-iranges
+  - bioconductor-s4vectors
+  - bioconductor-genomeinfodb
+  - bioconductor-rtracklayer
+  - bioconductor-excluderanges

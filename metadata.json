@@ -1,0 +1,71 @@
+{
+  "name": "oxo-flow-clindet",
+  "title": "Clinical WES tumor/normal variant calling: SNV + germline, MAF annotation, case report",
+  "origin": "port",
+  "rating": "community",
+  "engine": "snakemake",
+  "source": {
+    "repo": "zyllifeworld/clindet",
+    "url": "https://github.com/zyllifeworld/clindet",
+    "tag": "582a9131",
+    "sha": "582a9131bc806ee36c8176573d029a260d90e6a9",
+    "license": "MIT"
+  },
+  "created": "2026-08-15",
+  "domain": "cancer genomics (WES)",
+  "tags": ["wes", "somatic", "germline", "maf", "vep", "vcf2maf", "mutect2", "vardict", "varscan2", "muse", "strelka2", "caveman"],
+  "description": "Clinical WES tumor/normal pipeline: fastp QC -> bwa+fixmate+samtools sort -> GATK markdup -> five SNV callers (Mutect2, VarDict, VarScan2, MuSE, HaplotypeCaller) plus germline Strelka2+Manta and CaVEMan -> bcftools normalization -> vcf2maf with VEP annotation -> merged MAF -> region-based mutation flagging -> cancer case report (Rmd/knitr) and MultiQC. Ported verbatim from zyllifeworld/clindet default paired WES path.",
+  "scope": [
+    "fastp QC/trimming",
+    "bwa mem + samtools fixmate + sort (markdup-ready)",
+    "GATK MarkDuplicates + CollectHsMetrics + BQSR-recal path (BQSR off by default)",
+    "Somatic SNV: Mutect2 (with GetPileupSummaries/CalculateContamination), VarDict (testsomatic/var2vcf_paired), VarScan2 (mpileup/somatic/processSomatic/filter), MuSE (call/sump), HaplotypeCaller",
+    "Germline: Strelka2 + Manta (config + runWorkflow), CaVEMan (call/flag/germline flag)",
+    "bcftools normalization + per-caller FILTER rules",
+    "vcf2maf with VEP (cache 110)",
+    "MAF merge (somatic + germline)",
+    "Mutation flagging against BED tracks (flag_mutation_maf.R)",
+    "Cancer case report (Rmd sections) + MultiQC"
+  ],
+  "excluded": [
+    "CNV branch (purple/amber/cobalt/ASCAT/FACETS/sequenza/freec/exomedepth) — Broad-only, unbuildable without commercial licenses and heavy reference data",
+    "Extended SV branch (delly/gridss/svaba/BRASS/linx/igv-caller/jasmine) — reference-data heavy, out of default mini-test path",
+    "RNA branch (arriba/TRUST4/isofox/RNA SNV) — separate sample type, not in default WES path",
+    "Unpaired (single-sample) mode — upstream default is paired T/N",
+    "BQSR recalibration stage — upstream mini-test default sets recal_BQSR=false (the recal_link rules symlink the dedup BAM)"
+  ],
+  "rule_count": 60,
+  "tools": [
+    "fastp",
+    "bwa (>=0.7.18)",
+    "samtools",
+    "gatk4 4.6.2.0 (container)",
+    "bcftools >=1.22",
+    "bgzip",
+    "tabix",
+    "varscan 2.4.6",
+    "vardict-java 1.8.3 (container)",
+    "muse 2.1.2 (container)",
+    "strelka2",
+    "manta",
+    "caveman 1.15.3 (container)",
+    "vcf2maf 1.6.22",
+    "ensembl-vep 114.2",
+    "libboost 1.85.0",
+    "multiqc",
+    "R >= 4.4 (knitr, data.table, gpgr via post-deploy)"
+  ],
+  "installation": {
+    "engine": "oxo-flow >= 0.11.0",
+    "toolchain": "conda envs (envs/*.yaml) + pinned Singularity/Docker containers for GATK, VarDict, MuSE, CaVEMan; VEP cache installed via the clindet_vep env post-deploy",
+    "requirements": [
+      "Reference data: genome FASTA + .fai + .dict, target BED, dbSNP / Mills indels / gnomAD VCFs (paths in [config])",
+      "BWA index of the reference FASTA and tabix indexes for the annotation VCFs",
+      "VEP cache (GRCh38, version 110) at the configured vep_data path",
+      "Compute: up to 30 threads / 10 GB per rule"
+    ]
+  },
+  "repo_url": "https://github.com/WangLabCSU/oxo-flow-clindet",
+  "license": "Apache-2.0",
+  "upstream_license": "MIT"
+}

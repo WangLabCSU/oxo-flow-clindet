@@ -1,13 +1,33 @@
+# Ported verbatim from upstream envs/clindet.yaml (pins preserved; snakemake
+# plugins dropped — the port runs natively under oxo-flow).
 name: clindet
 channels:
   - conda-forge
   - bioconda
   - defaults
 dependencies:
-  - bwa=0.7.18
-  - samtools=1.20
-  - fastp=0.23.4
-  - gatk4=4.5.0.0
-  - picard=3.2.0
-  - python=3.11
-  - snakemake=8.10.0
+  - ascat>=3.2.0
+  - bcftools>=1.22
+  - r-base
+  - r-tidyverse
+  - cancerit-allelecount
+  - bwa>=0.7.18
+  - bwidget>=1.9.14
+  - bzip2
+  - htslib
+  - python
+  - samtools
+  - varscan=2.4.6
+  - vcflib
+  - vcftools
+  - picard
+  - ucsc-fasplit
+  - bedtools
+  - fastp
+  - r-exomedepth
+  - r-r.utils
+  - configparser
+  - sra-tools
+  - pysam
+  - pip
+  - bioconductor-tximport

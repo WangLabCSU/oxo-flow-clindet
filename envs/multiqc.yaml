@@ -1,0 +1,8 @@
+# Ported verbatim from upstream envs/multiqc.yaml.
+name: clindet_multiqc
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bioconda::multiqc

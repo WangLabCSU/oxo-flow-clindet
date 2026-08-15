@@ -1,0 +1,65 @@
+# Cancer case report + MultiQC, ported from upstream
+# workflow/WES/rules/report/case_report.smk + multiqc.smk.
+# run_cancer_report passes only the somatic MAF/panel/Rmd params; all CNV/QC
+# params stay unset (NULL) and the Rmd sections tolerate them exactly as the
+# upstream default mini-test path does (those inputs only exist when the CNV
+# callers run). Gated by config.run_report (default true in the port).
+
+[workflow]
+name = "report"
+
+# ------------------------------------------------------- cancer report ----
+[[rules]]
+name = "run_cancer_report"
+input = {
+    somatic_mut_maf = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf",
+    af_keygenes = "report/somatic_panel.tsv",
+    rmd_file = "report/main.Rmd"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html" ]
+when = "config.run_report"
+resources = { memory = "10000M" }
+description = "render the clindet case report (upstream run_cancer_report + rmd.R)"
+shell = """Rscript scripts/smk.R --script scripts/rmd.R --param report_rmd {input.rmd_file} --param output_file {output[0]} --param af_keygenes {input.af_keygenes} --param genome_version {config.genome_version} --param tumor_name {pair_id} --param somatic_mut_maf {input.somatic_mut_maf}"""
+[rules.environment]
+conda = "envs/cancer_report.yaml"
+
+# --------------------------------------------------------------- multiqc ----
+# prep gathers fastp jsons + dedup metrics + picard hs metrics into a
+# per-sample filelist (conpair/purple files are out of scope in the port).
+[[rules]]
+name = "prep_multiqc_data"
+input = {
+    fastp_tum = "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-T-fastp.json",
+    fastp_nc = "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-NC-fastp.json",
+    dedup_metrics = "{config.output_dir}/{config.genome_version}/results/qc/dedup/paired/{pair_id}-T.metrics.txt",
+    picard = "{config.output_dir}/{config.genome_version}/results/stats/paired/wes_metrics/{pair_id}-T.txt"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt" ]
+when = "config.run_report"
+description = "collect QC files for MultiQC (upstream prep_multiqc_data, in-scope subset)"
+shell = """printf '%s\\n' "{input.fastp_tum}" "{input.fastp_nc}" "{input.dedup_metrics}" "{input.picard}" > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "combined_multiqc_prep_multiqc_data"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt", variables = { pair_id = "config.pair_ids" } }
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/multiqc/filelist.txt" ]
+when = "config.run_report"
+description = "merge per-sample filelists into one (upstream combined_multiqc_prep_multiqc_data)"
+shell = """cat {input} | sort -u > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "combined_multiqc"
+input = [ "{config.output_dir}/{config.genome_version}/results/multiqc/filelist.txt" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/multiqc_report.html" ]
+when = "config.run_report"
+description = "run MultiQC on the filelist (upstream combined_multiqc)"
+shell = """multiqc -f -o . -l {input[0]} --filename {output[0]}"""
+[rules.environment]
+conda = "envs/multiqc.yaml"

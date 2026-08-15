@@ -1,0 +1,188 @@
+# Common QC + mapping rules, ported verbatim from upstream
+# workflow/common/rules/qc.smk + workflow/common/rules/mapping.smk.
+# Output paths keep the upstream layout:
+#   {output_dir}/{genome_version}/results/{trimmed,mapped,dedup,recal,picard,stats,qc}
+#
+# Upstream uses a {group} wildcard ('T'/'NC') for tumor/normal; oxo-flow has no
+# group source here, so each rule is unrolled into explicit _tumor/_normal
+# variants with the literal '-T' / '-NC' file suffixes (identical naming).
+
+[workflow]
+name = "common"
+
+# ---------------------------------------------------------------- fastp ----
+[[rules]]
+name = "fastp_tumor_sample"
+input = { R1 = "{config.tumor_fastq_r1}", R2 = "{config.tumor_fastq_r2}" }
+output = [
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R1.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R2.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-T-fastp.html",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-T-fastp.json"
+]
+resources = { threads = 10 }
+description = "fastp QC/trimming on tumor reads"
+shell = """fastp --thread {threads} -i {input.R1} -I {input.R2} -w 8 -Q -c -L -h {output[2]} -j {output[3]} -o {output[0]} -O {output[1]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "fastp_normal_sample"
+input = { R1 = "{config.normal_fastq_r1}", R2 = "{config.normal_fastq_r2}" }
+output = [
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-NC_R1.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-NC_R2.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-NC-fastp.html",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-NC-fastp.json"
+]
+resources = { threads = 10 }
+description = "fastp QC/trimming on normal reads"
+shell = """fastp --thread {threads} -i {input.R1} -I {input.R2} -w 8 -Q -c -L -h {output[2]} -j {output[3]} -o {output[0]} -O {output[1]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ----------------------------------------------------------- bam flagstat ----
+[[rules]]
+name = "bam_flagstat_tumor"
+input = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T.bam.flagstat" ]
+resources = { threads = 10 }
+description = "samtools flagstat on tumor recalibrated BAM"
+shell = """samtools flagstat -@ {threads} {input[0]} > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "bam_flagstat_normal"
+input = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC.bam.flagstat" ]
+resources = { threads = 10 }
+description = "samtools flagstat on normal recalibrated BAM"
+shell = """samtools flagstat -@ {threads} {input[0]} > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# --------------------------------------------------------------- mapping ----
+[[rules]]
+name = "map_reads_tumor"
+input = {
+    R1 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R1.fastq.gz",
+    R2 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R2.fastq.gz"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-T.sorted.bam" ]
+resources = { threads = 30 }
+description = "bwa mem -MR + fixmate + sort for tumor (upstream map_reads)"
+shell = """bwa mem -t {threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {threads} -O bam -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "map_reads_normal"
+input = {
+    R1 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-NC_R1.fastq.gz",
+    R2 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-NC_R2.fastq.gz"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-NC.sorted.bam" ]
+resources = { threads = 30 }
+description = "bwa mem -MR + fixmate + sort for normal (upstream map_reads)"
+shell = """bwa mem -t {threads} -MR '@RG\\tID:{pair_id}_NC\\tPL:Illumia\\tSM:{pair_id}_NC\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {threads} -O bam -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------------- mark duplicates ----
+[[rules]]
+name = "mark_duplicates_tumor"
+input = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-T.sorted.bam" ]
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-T.sorted.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-T.sorted.bai",
+    metrics = "{config.output_dir}/{config.genome_version}/results/qc/dedup/paired/{pair_id}-T.metrics.txt"
+}
+description = "gatk MarkDuplicates on tumor (upstream default branch)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk MarkDuplicates --CREATE_INDEX true --VALIDATION_STRINGENCY SILENT -I {input[0]} -O {output.bam} -M {output.metrics}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "mark_duplicates_normal"
+input = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-NC.sorted.bam" ]
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-NC.sorted.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-NC.sorted.bai",
+    metrics = "{config.output_dir}/{config.genome_version}/results/qc/dedup/paired/{pair_id}-NC.metrics.txt"
+}
+description = "gatk MarkDuplicates on normal (upstream default branch)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk MarkDuplicates --CREATE_INDEX true --VALIDATION_STRINGENCY SILENT -I {input[0]} -O {output.bam} -M {output.metrics}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+# ----------------------------------------------------- recal link (off) ----
+# recal_BQSR = False in the upstream mini-test config: dedup BAM is symlinked
+# into results/recal/ (upstream recal_link rule).
+[[rules]]
+name = "recal_link_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-T.sorted.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-T.sorted.bai"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam.bai"
+}
+description = "symlink tumor dedup BAM to recal path when recal_BQSR=False"
+shell = """ln -s $(realpath {input.bam}) {output.bam}
+ln -s $(realpath {input.bai}) {output.bai}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "recal_link_normal"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-NC.sorted.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-NC.sorted.bai"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam.bai"
+}
+description = "symlink normal dedup BAM to recal path when recal_BQSR=False"
+shell = """ln -s $(realpath {input.bam}) {output.bam}
+ln -s $(realpath {input.bai}) {output.bai}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------- picard hs metrics ----
+[[rules]]
+name = "bed_to_interval_list"
+input = { bed = "{config.target_bed}", dict = "{config.reference_dict}" }
+output = [ "{config.output_dir}/{config.genome_version}/picard/{pair_id}.interval_list" ]
+description = "gatk BedToIntervalList for CollectHsMetrics"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk BedToIntervalList --INPUT {input.bed} --SEQUENCE_DICTIONARY {input.dict} --SORT true --OUTPUT {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "picard_collect_wes_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    reference = "{config.reference}",
+    intervals = "{config.output_dir}/{config.genome_version}/picard/{pair_id}.interval_list"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wes_metrics/{pair_id}-T.txt" ]
+description = "gatk CollectHsMetrics on tumor (upstream picard_collect_wes)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectHsMetrics --INPUT {input.bam} --OUTPUT {output[0]} --REFERENCE_SEQUENCE {input.reference} --BAIT_INTERVALS {input.intervals} --TARGET_INTERVALS {input.intervals}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "picard_collect_wes_normal"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    reference = "{config.reference}",
+    intervals = "{config.output_dir}/{config.genome_version}/picard/{pair_id}.interval_list"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wes_metrics/{pair_id}-NC.txt" ]
+description = "gatk CollectHsMetrics on normal (upstream picard_collect_wes)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectHsMetrics --INPUT {input.bam} --OUTPUT {output[0]} --REFERENCE_SEQUENCE {input.reference} --BAIT_INTERVALS {input.intervals} --TARGET_INTERVALS {input.intervals}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"

@@ -27,7 +27,7 @@
 # somatic_sv_tsv Path to SV TSV file.
 # somatic_sv_vcf Path to SV VCF file.
 # tumor_name Name of tumor sample.
-# out_file Path to output HTML file (needs '.html' suffix) (def: `{tumor_name}_cancer_report.html`).
+# out_file Path to output HTML file (needs '.html' suffix) (def = `{tumor_name}_cancer_report.html`).
 # quiet Suppress log printing during rendering.
 
 report_rmd <- snakemake@params[['report_rmd']]
@@ -36,16 +36,20 @@ out_dir <- dirname(output_file)
 result_outdir <- dirname(output_file)
 sv_available = FALSE # will not report SVs in WES and target panel
 pars <- list(
-  batch_name = snakemake@params[['batch_name']],
+  # batch_name = snakemake@params[['batch_name']],
   af_keygenes = snakemake@params[['af_keygenes']],
   genome_version = snakemake@params[['genome_version']],
   sv_available = sv_available,
-  # bcftools_stats = snakemake@params[['bcftools_stats']],
-  # key_genes = snakemake@params[['key_genes']],
-  # somatic_snv_vcf = snakemake@params[['somatic_snv_vcf']],
-  # somatic_snv_summary = snakemake@params[['somatic_snv_summary']],
-  # somatic_sv_tsv = snakemake@params[['somatic_sv_tsv']],
-  # somatic_sv_vcf = snakemake@params[['somatic_sv_vcf']],
+  ## patient and sample info
+  patient_csv = snakemake@params[['patient_csv']],
+  ## Assay QC
+  ngs_bit_sample_gender = snakemake@params[['ngs_bit_sample_gender']],
+  conpair_contamination = snakemake@params[['conpair_contamination']],
+  conpair_concordance = snakemake@params[['conpair_concordance']],
+  ngs_bit_mapqc_tumor = snakemake@params[['ngs_bit_mapqc_tumor']],
+  ngs_bit_mapqc_normal = snakemake@params[['ngs_bit_mapqc_normal']],
+  ## somatic mut MAF ########
+  somatic_mut_maf = snakemake@params[['somatic_mut_maf']],
   ### CNV results and plot dir
   ascat_res_dir = snakemake@params[['ascat_res_dir']],
   purple_res_dir = snakemake@params[['purple_res_dir']],
@@ -56,9 +60,10 @@ pars <- list(
   purple_purity = snakemake@params[['purple_purity']],
   purple_qc = snakemake@params[['purple_qc']],
   purple_som_snv_vcf = snakemake@params[['purple_som_snv_vcf']],
+  ## virus reports #######
   virusbreakend_tsv = snakemake@params[['virusbreakend_tsv']],
   virusbreakend_vcf = snakemake@params[['virusbreakend_vcf']],
-  result_outdir = result_outdir,
+  # result_outdir = result_outdir,
   tumor_name = snakemake@params[['tumor_name']]
 )
 

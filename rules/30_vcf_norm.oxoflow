@@ -1,0 +1,111 @@
+# VCF normalization + per-caller filtering, ported verbatim from upstream
+# workflow/common/rules/merge_loop.smk (vcf_norm) and
+# workflow/common/rules/merge_loop_germline.smk (vcf_norm_germline).
+# Upstream fans out over a {caller} wildcard driven by the caller lists; the
+# port unrolls static per-caller rules (oxo-flow has no caller wildcard source)
+# using the exact upstream get_bcftools_filter_rules() expressions.
+#
+# Somatic vcf_norm rules consume results/vcf/paired/{sample}/{caller}.vcf and
+# write results/vcf_norm/paired/{sample}/{caller}.vcf.
+
+[workflow]
+name = "vcf_norm"
+
+# ---------------------------------------------------------------- Mutect2 ----
+[[rules]]
+name = "vcf_norm_Mutect2"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Mutect2.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/Mutect2.vcf" ]
+description = "bcftools norm + filter FILTER=PASS (upstream filter for mutect2)"
+shell = """bcftools norm -f {config.reference} {input[0]} -Ou | bcftools view -i 'FILTER="PASS"' -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ---------------------------------------------------------------- vardict ----
+[[rules]]
+name = "vcf_norm_vardict"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/vardict.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/vardict.vcf" ]
+description = "vardict special path: add contig header from .fai, norm + FILTER=PASS (upstream vcf_norm vardict branch)"
+shell = """if [ ! -s {config.reference}.fai ]; then
+    samtools faidx {config.reference}
+fi
+contig_header="{output[0]}.contigs.header"
+tmp_vcf="{output[0]}.with_contig.tmp.vcf"
+awk 'BEGIN{OFS=""}{print "##contig=<ID="$1",length="$2">"}' {config.reference}.fai > "$contig_header"
+bcftools annotate --header-lines "$contig_header" {input[0]} -Ov -o "$tmp_vcf"
+bcftools norm -f {config.reference} "$tmp_vcf" -Ou | bcftools view -i 'FILTER="PASS"' -Ov -o {output[0]}
+rm -f "$contig_header" "$tmp_vcf" """
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# --------------------------------------------------------------- varscan2 ----
+[[rules]]
+name = "vcf_norm_varscan2"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/varscan2.vcf" ]
+description = "bcftools norm + filter FILTER=PASS (upstream default filter)"
+shell = """bcftools norm -f {config.reference} {input[0]} -Ou | bcftools view -i 'FILTER="PASS"' -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------------------- muse ----
+[[rules]]
+name = "vcf_norm_muse"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/muse.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/muse.vcf" ]
+description = "bcftools norm + exclude Tier5 (upstream filter for muse)"
+shell = """bcftools norm -f {config.reference} {input[0]} -Ou | bcftools view -e 'FILTER~"Tier5"' -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------------- HaplotypeCaller ----
+[[rules]]
+name = "vcf_norm_HaplotypeCaller"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/HaplotypeCaller.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/HaplotypeCaller.vcf" ]
+description = "bcftools norm + filter QUAL >= 30 (upstream filter for haplotypecaller)"
+shell = """bcftools norm -f {config.reference} {input[0]} -Ou | bcftools view -i 'QUAL >= 30' -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------- germline: strelkamanta ----
+[[rules]]
+name = "vcf_norm_germline_strelkamanta"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/strelkamanta.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_germline_norm/paired/{pair_id}/strelkamanta.vcf" ]
+description = "germline bcftools norm + FILTER=PASS (upstream default filter)"
+shell = """bcftools norm -f {config.reference} {input[0]} -Ou | bcftools view -i 'FILTER="PASS"' -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------- germline: caveman ----
+[[rules]]
+name = "vcf_norm_germline_caveman"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/caveman.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_germline_norm/paired/{pair_id}/caveman.vcf" ]
+description = "germline bcftools norm + caveman filter (upstream filter for caveman)"
+shell = """bcftools norm -f {config.reference} {input[0]} -Ou | bcftools view -i 'FILTER="PASS" || (FILTER="." && DP>30)' -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"

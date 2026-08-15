@@ -1,0 +1,20 @@
+# Ported verbatim from upstream envs/cancer_report.yaml. gpgr is installed by
+# envs/cancer_report.post-deploy.sh (upstream post-deploy hook).
+name: cancer_report
+channels:
+  - umccr
+  - conda-forge
+  - bioconda
+dependencies:
+  - pandoc
+  - r-base >=4.4
+  - r-tidyverse
+  - r-devtools
+  - r-remotes
+  - r-r.oo
+  - r-reactable
+  - r-htmltools
+  - r-details
+  - r-patchwork
+  - r-kableextra
+  - r-dt

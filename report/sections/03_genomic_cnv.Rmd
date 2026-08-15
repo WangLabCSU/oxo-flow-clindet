@@ -1,0 +1,337 @@
+## **Copy Number Variantions**
+
+```{r}
+library(reactable)
+library(htmltools)
+
+#---- PURPLE CNV Tables ----#
+if (!is.null(params$af_keygenes)) {
+  af_gene_info <- params$af_keygenes
+} else {
+  af_gene_info <- 'https://raw.githubusercontent.com/umccr/gene_panels/v24.03.0/somatic_panel/3_final_panel/final_panel.tsv'
+}
+purple_cnv_som <- gpgr::purple_cnv_som_process(params$purple_som_cnv)
+purple_cnv_som_gene <- gpgr::purple_cnv_som_gene_process(params$purple_som_gene_cnv,af_gene_info)
+
+# NOTE(QC): samples are considered hypermutated if they have more than 500k variant
+cnv_summary <-
+  list(som = purple_cnv_som$tab) %>%
+  purrr::map(~ dplyr::summarise(
+    .x,
+    Min = round(min(CN), 2),
+    Max = round(max(CN), 2),
+    N = dplyr::n(), .groups = "drop_last"
+  ))
+
+if (is.null(params$sv_available) | params$sv_available) {
+  sv_summary <- tibble(unmelted = c(0), melted = c(0))
+} else {
+  sv_summary <- list(
+    unmelted = sv$map %>% dplyr::select(Type),
+    melted = sv$map_melted %>% dplyr::select(Type)
+  ) %>%
+    purrr::map(function(x) addmargins(table(x, useNA = "ifany"))) %>%
+    do.call("rbind", .) %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column(var = "group") %>%
+    tidyr::pivot_longer(-group) %>%
+    dplyr::mutate(value = paste0(name, ": ", value)) %>%
+    tidyr::pivot_wider(names_from = group, values_from = value) %>%
+    dplyr::select(unmelted, melted)
+}
+
+```
+
+
+###  __PURPLE Somatic CNV Calls (gene level)__  {#gene-panel-cnv}
+<details>
+<summary>Description</summary>
+
+PURPLE copy number alterations. - description
+is from <https://github.com/hartwigmedical/hmftools/blob/master/purity-ploidy-estimator/README.md#gene-copy-number-file>
+
+```{r purple_gene_cnv_description}
+purple_cnv_som_gene$descr %>%
+  dplyr::mutate(
+    Column = kableExtra::cell_spec(Column, bold = TRUE)
+  ) %>%
+  kableExtra::kbl(escape = FALSE) %>%
+  kableExtra::kable_paper(c("hover", "striped"), full_width = FALSE, position = "left") %>%
+  kableExtra::scroll_box(height = "200px")
+```
+
+</details>
+
+```{r purple_gene_cnv_tab}
+purple_cnv_som_gene$tab %>%
+  DT::datatable(
+    filter = list(position = "top", clear = FALSE, plain = TRUE),
+    class = "cell-border display compact",
+    rownames = FALSE, extensions = c("Scroller", "Buttons", "KeyTable"),
+    options = list(
+      scroller = TRUE, scrollY = 400, scrollX = TRUE, autoWidth = TRUE, keys = TRUE,
+      buttons = c("csv", "excel"), dom = "Bfrtip"
+    )
+  ) %>%
+  DT::formatCurrency(~ start + end, currency = "", interval = 3, mark = ",", digits = 0) %>%
+  DT::formatRound(~ minCN + maxCN, digits = 1)
+```
+
+```{r, results='asis'}
+blank_lines(2)
+```
+
+### __PURPLE Somatic CNV Calls (Arm level)__{#cnv-segments}
+#### __QC, Purity and Ploidy Summary__ {.unnumbered}
+
+PURPLE outputs a QC status along with a summary
+for the inferred purity and ploidy of the somatic sample.
+A failed QC status can be attributed to several factors
+(see `Description` below).
+
+<details>
+<summary>Description</summary>
+
+__QC Status__
+
+The QC Status field reflects how we have determined the purity of the sample:
+
+* `NORMAL` - PURPLE fit the purity using COBALT and AMBER output.
+* `HIGHLY_DIPLOID` - The fitted purity solution is highly diploid (> 95%)
+  with a large range of potential solutions, but somatic variants are unable to
+  help either because they were not supplied or because their implied purity was too low.
+* `SOMATIC` - Somatic variants have improved the otherwise highly diploid solution.
+* `NO_TUMOR` - PURPLE failed to find any aneuploidy and somatic variants were
+  supplied but there were fewer than 300 with observed VAF > 0.1.
+
+__QC Failure__
+
+There are several reasons PURPLE may classify a sample as failed:
+
+* `FAIL_SEGMENT`: more than 220 copy number segments __not__ supported at either end
+  by SV breakpoints. Indicates samples with extreme GC bias, with differences
+  in depth of >= 10x between high and low GC regions. GC normalisation is
+  unreliable when the corrections are so extreme so it is recommended to fail
+  the sample (concerns with miscalled deletions or amplifications or have
+  poor sensitivity in high GC regions.
+* `NO_TUMOR`: no aneuploidy found and the number of somatic SNVs found is
+  less than 1,000
+* `MIN_PURITY`: fitted purity < 20%
+* `FAIL_DELETED_GENES`: more than 280 deleted genes. This QC step was added
+  after observing that in a handful of samples with high MB scale positive GC
+  bias we sometimes systematically underestimate the copy number in high GC
+  regions. This can lead us to incorrectly infer homozygous loss of entire
+  chromosomes, particularly on chromosomes 17 and 19.
+* `FAIL_GENDER`: if the AMBER and COBALT inferred genders are inconsistent
+  then the COBALT one is used but the sample is failed.
+
+</details>
+
+<p>&nbsp;</p>
+
+```{r purple_qc_summary}
+library(dplyr)
+purple_qc_tbl <- purple_qc_summary %>%
+  dplyr::select(variable, value) %>%
+  dplyr::mutate(
+    value = as.character(value)
+  )
+
+value_color <- function(value) {
+  dplyr::case_when(
+    value %in% c("PASS", "TRUE") ~ "green",
+    grepl("FAIL", value) | value == "FALSE" | value == "MALE_KLINEFELTER" ~ "red",
+    value == "FEMALE" ~ "purple",
+    value == "MALE" ~ "blue",
+    TRUE ~ "#111827"
+  )
+}
+
+div(
+  style = "
+    width: 90%;
+    margin: 20px auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  ",
+  reactable(
+    purple_qc_tbl,
+    pagination = FALSE,
+    bordered = TRUE,
+    striped = TRUE,
+    highlight = TRUE,
+    compact = TRUE,
+    columns = list(
+      variable = colDef(
+        name = "Metric",
+        style = list(
+          fontWeight = "bold"
+        )
+      ),
+      value = colDef(
+        name = "Value",
+        style = function(value) {
+          list(
+            fontWeight = "bold",
+            color = value_color(value)
+          )
+        }
+      )
+    ),
+    theme = reactableTheme(
+      borderColor = "#e5e7eb",
+      stripedColor = "#f8fafc",
+      highlightColor = "#eef6ff",
+      cellPadding = "6px 8px",
+      style = list(
+        fontFamily = "Arial, Helvetica, sans-serif",
+        fontSize = "13px"
+      ),
+      headerStyle = list(
+        background = "#1e3a8a",
+        color = "white",
+        fontWeight = "700"
+      )
+    )
+  )
+)
+```
+
+#### __PURPLE segment output__ {.unnumbered}
+<details>
+<summary>Description</summary>
+
+PURPLE outputs a file with the copy number profile of all contiguous segments
+of the tumor sample:
+
+PURPLE copy number profile of all (contiguous) segments of the tumor sample - description
+is from <https://github.com/hartwigmedical/hmftools/blob/master/purity-ploidy-estimator/README.md#copy-number-file>
+
+
+```{r purple_seg_description}
+purple_cnv_som$descr %>%
+  dplyr::mutate(
+    Column = kableExtra::cell_spec(Column, bold = TRUE)
+  ) %>%
+  kableExtra::kbl(escape = FALSE) %>%
+  kableExtra::kable_paper(c("hover", "striped"), full_width = FALSE, position = "left") %>%
+  kableExtra::scroll_box(height = "200px")
+```
+
+</details>
+
+```{r purple_cnv_som_tab}
+purple_cnv_som$tab %>%
+  DT::datatable(
+    filter = list(position = "top", clear = FALSE, plain = TRUE),
+    class = "cell-border display compact",
+    rownames = FALSE, extensions = c("Scroller", "Buttons", "KeyTable"),
+    options = list(
+      scroller = TRUE, scrollY = 400, scrollX = TRUE, autoWidth = TRUE, keys = TRUE,
+      buttons = c("csv", "excel"), dom = "Bfrtip"
+    )
+  ) %>%
+  DT::formatCurrency(~ Start + End, currency = "", interval = 3, mark = ",", digits = 0)
+```
+
+
+```{r, results='asis'}
+blank_lines(2)
+```
+
+### __PURPLE CNV Visualization__ {.tabset .tabset-fade #purple-charts}
+
+PURPLE generates charts for summarising tumor sample characteristics.
+Description is from the [PURPLE docs](https://github.com/hartwigmedical/hmftools/tree/master/purity-ploidy-estimator#charts).
+
+#### Purity/ploidy {.unnumbered}
+
+The following 'sunrise' chart shows the range of scores of all examined solutions of
+purity and ploidy. Crosshairs identify the best purity / ploidy solution.
+
+```{r purple_plot_purityrange, out.width="60%"}
+knitr::include_graphics(file.path(purple_dir,'plot', paste0(params$tumor_name, ".purity.range.png")))
+```
+
+```{r, results='asis'}
+blank_lines(2)
+```
+
+#### Copy number / Minor allele ploidy {.unnumbered}
+
+The following figures show the AMBER BAF count weighted distribution of
+copy number and minor allele ploidy throughout the fitted segments.
+Copy numbers are broken down by colour into their respective minor
+allele ploidy (MAP) while the minor allele ploidy figure is broken
+down by copy number.
+
+```{r purple_plot_copynumber, echo=FALSE, fig.show='hold', out.width='38%', fig.align='center'}
+knitr::include_graphics(c(
+  file.path(purple_dir,'plot', paste0(params$tumor_name,".copynumber.png")),
+  file.path(purple_dir,'plot', paste0(params$tumor_name, ".map.png"))
+))
+```
+
+#### Ploidy by CN {.unnumbered}
+
+If a somatic variant VCF has been supplied, a figure will be produced
+showing the somatic variant ploidy broken down by copy number.
+
+```{r purple_plot_somatic, out.width="60%"}
+knitr::include_graphics(file.path(purple_dir,'plot', paste0(params$tumor_name, ".somatic.png")))
+```
+
+#### Clonality {.unnumbered}
+
+The following diagram illustrates the clonality model of a typical sample.
+
+The top figure shows the histogram of somatic ploidy for all SNVs and INDELs in blue.
+Superimposed are peaks in different colours fitted from the sample as described in the
+docs while the black line shows the overall fitted ploidy distribution. Red filled
+peaks are below the 0.85 subclonal threshold.
+
+We can determine the likelihood of a variant being subclonal at
+any given ploidy as shown in the bottom half of the figure.
+
+```{r purple_plot_somaticclonality, out.width="60%"}
+knitr::include_graphics(file.path(purple_dir,'plot', paste0(params$tumor_name, ".somatic.clonality.png")))
+```
+
+#### Segment {.unnumbered}
+
+The contribution of each fitted segment to the final score of the best fit is shown in
+the following figure. Each segment is divided into its major and minor allele ploidy.
+The area of each circle shows the weight (AMBER baf count) of each segment.
+
+```{r purple_plot_segment, out.width="60%"}
+knitr::include_graphics(file.path(purple_dir,'plot', paste0(params$tumor_name, ".segment.png")))
+```
+
+### __ASCAT CNV Visualization__ {.tabset .tabset-fade #ascat-charts}
+
+ASCAT generates charts for summarising tumor sample characteristics.
+Description is from the [ASCAT docs](https://www.mdanderson.org/research/departments-labs-institutes/labs/van-loo-laboratory/resources.html#ASCAT).
+
+#### Purity/ploidy {.unnumbered}
+
+The following 'sunrise' chart shows the range of scores of all examined solutions of
+purity and ploidy. Crosshairs identify the best purity / ploidy solution.
+
+```{r ascat_plot_purityrange, out.width="40%"}
+knitr::include_graphics(file.path(ascat_dir,'Tumor.sunrise.png'))
+```
+
+```{r, results='asis'}
+blank_lines(2)
+```
+
+#### Copy number / Minor allele ploidy {.unnumbered}
+
+The following figures show the segment results of ASCAT.
+
+```{r ascat_plot_copynumber, out.width="80%",out.height = "260px"}
+knitr::include_graphics(file.path(ascat_dir,'Tumor.ASCATprofile.png'))
+```
+

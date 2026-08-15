@@ -1,0 +1,171 @@
+# Germline callers, ported verbatim from upstream
+# workflow/WES/rules/rtm/paired/SNV/Strelka.smk (Manta + Strelka2)
+# and workflow/WES/rules/cgp/cgpCaVEMan.smk (CaVEMan else-branch, hg38_chr21).
+
+[workflow]
+name = "germline"
+
+# ------------------------------------------------------------------ Manta ----
+[[rules]]
+name = "call_config_strelka"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    ref = "{config.reference}",
+    bed = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/logs/strelka/paired/{pair_id}/{pair_id}-Manta.log"
+]
+description = "configManta.py tumor/normal SV + indel candidates (upstream call_config_strelka)"
+shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
+[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+configManta.py --tumorBam {input.Tum} --bam {input.NC} --runDir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta --exome --callRegions {input.bed}.gz --referenceFasta {input.ref}
+{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/runWorkflow.py
+touch {output[1]}"""
+[rules.environment]
+conda = "envs/strelka.yaml"
+
+# ------------------------------------------------------- Strelka2 (germline) ----
+[[rules]]
+name = "call_strelka_manta_germline"
+input = {
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    ref = "{config.reference}",
+    indelcd = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz",
+    bed = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta/results/variants/variants.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/logs/strelka/paired/{pair_id}/{pair_id}-StrelkaManta.log"
+]
+resources = { threads = 8 }
+description = "configureStrelkaGermlineWorkflow on normal (upstream call_strelka_manta_germline)"
+shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
+[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+configureStrelkaGermlineWorkflow.py --bam {input.NC} --referenceFasta {input.ref} --indelCandidates {input.indelcd} --exome --runDir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta --callRegions {input.bed}.gz
+{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta/runWorkflow.py -m local -j {threads}
+touch {output[1]}"""
+[rules.environment]
+conda = "envs/strelka.yaml"
+
+# Upstream bug: merge_strelka_manta references undefined {params.indel}; the
+# germline Strelka2 run produces a single variants.vcf.gz (SNVs+indels), so the
+# port merges that one file (documented in README Fidelity).
+[[rules]]
+name = "merge_strelka_manta"
+input = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta/results/variants/variants.vcf.gz" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/strelkamanta.vcf" ]
+description = "merge Strelka2 germline variants + rename TUMOR/NORMAL sample ids"
+shell = """bcftools concat -a -Ou {input[0]} | bcftools sort -Ov -o {output[0]}
+sed -i "s;TUMOR;{pair_id}_T;" {output[0]}
+sed -i "s;NORMAL;{pair_id}_NC;" {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------- Strelka2 somatic (Manta-driven) ----
+[[rules]]
+name = "call_strelka_somatic_manta"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    ref = "{config.reference}",
+    indelcd = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz",
+    bed = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.snvs.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.indels.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/logs/strelka/paired/{pair_id}/{pair_id}-StrelkaSomaticeManta.log"
+]
+resources = { threads = 8 }
+description = "configureStrelkaSomaticWorkflow with Manta candidates (upstream call_strelka_somatic_manta)"
+shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
+[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+configureStrelkaSomaticWorkflow.py --tumorBam {input.Tum} --normalBam {input.NC} --indelCandidates {input.indelcd} --referenceFasta {input.ref} --runDir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta --callRegions {input.bed}.gz
+{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/runWorkflow.py -m local -j {threads}
+touch {output[2]}"""
+[rules.environment]
+conda = "envs/strelka.yaml"
+
+[[rules]]
+name = "merge_strelka_somatic_manta"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.snvs.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.indels.vcf.gz"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/strelkasomaticmanta.vcf" ]
+description = "merge Strelka2 somatic snvs+indels (upstream merge_strelka_somatic_manta)"
+shell = """bcftools concat -a -Ou {input[0]} {input[1]} | bcftools sort -Ov -o {output[0]}
+sed -i "s;TUMOR;{pair_id}_T;" {output[0]}
+sed -i "s;NORMAL;{pair_id}_NC;" {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ---------------------------------------------------------------- CaVEMan ----
+# hg38_chr21 is not in the upstream 'human' list ['hg19','b37','hg38','hg38_EBV'],
+# so the else-branch applies: empty CNV beds + blanket copy number (-td 2 -nd 2).
+[[rules]]
+name = "CM_cnv"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/cnv/paired/{pair_id}/{pair_id}_Tcnv.bed",
+    "{config.output_dir}/{config.genome_version}/results/cnv/paired/{pair_id}/{pair_id}_NCcnv.bed"
+]
+description = "empty CNV beds for CaVEMan (upstream CM_cnv else-branch)"
+shell = """touch {output[0]}
+touch {output[1]}"""
+
+[[rules]]
+name = "CM_call"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    Tcnv = "{config.output_dir}/{config.genome_version}/results/cnv/paired/{pair_id}/{pair_id}_Tcnv.bed",
+    NCcnv = "{config.output_dir}/{config.genome_version}/results/cnv/paired/{pair_id}/{pair_id}_NCcnv.bed"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman/{pair_id}_T_vs_{pair_id}_NC.muts.ids.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman/{pair_id}_T_vs_{pair_id}_NC.snps.ids.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/logs/paired/caveman/caveman_{pair_id}.log"
+]
+resources = { threads = 20 }
+description = "caveman.pl somatic SNV calling (upstream CM_call else-branch)"
+shell = """caveman.pl -outdir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman -reference {config.reference}.fai -tc {input.Tcnv} -nc {input.NCcnv} -td 2 -nd 2 -tumour-bam {input.Tum} -normal-bam {input.NC} -ignore-file "" -s {config.genome_version} -sa {config.genome_version} -seqType WGS -t {threads} -no-flagging
+touch {output[2]}"""
+[rules.environment]
+singularity = "docker://quay.io/wtsicgp/cgpcavemanwrapper:1.15.3"
+
+[[rules]]
+name = "CM_flag"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    log = "{config.output_dir}/{config.genome_version}/logs/paired/caveman/caveman_{pair_id}.log",
+    vcf = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman/{pair_id}_T_vs_{pair_id}_NC.muts.ids.vcf.gz"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman.vcf" ]
+resources = { threads = 20 }
+description = "cgpFlagCaVEMan.pl somatic filtering (upstream CM_flag; flag params empty for hg38_chr21)"
+shell = """cgpFlagCaVEMan.pl -i {input.vcf} -o {output[0]} -m {input.Tum} -n {input.NC} -s {config.genome_version} -t genome -ref {config.reference}.fai -c "" -v "" -u "" -g "" -b "" -umv . -ab """""
+[rules.environment]
+singularity = "docker://quay.io/wtsicgp/cgpcavemanwrapper:1.15.3"
+
+[[rules]]
+name = "CM_germ_flag"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    log = "{config.output_dir}/{config.genome_version}/logs/paired/caveman/caveman_{pair_id}.log",
+    snp = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman/{pair_id}_T_vs_{pair_id}_NC.snps.ids.vcf.gz"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/caveman.vcf" ]
+resources = { threads = 20 }
+description = "bcftools LowDP germline filter (upstream CM_germ_flag)"
+shell = """bcftools filter -e 'DP<=30' -s LowDP --mode x {input.snp} -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"

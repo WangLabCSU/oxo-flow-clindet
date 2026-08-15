@@ -1,0 +1,209 @@
+## **Somatic SNV/Indel** {#snv-indel}
+
+```{r somatic_mut_maf}
+library(tidyverse)
+library(reactable)
+library(htmltools)
+
+coding_classes <- c(
+  "Missense_Mutation",
+  "Nonsense_Mutation",
+  "Frame_Shift_Del",
+  "Frame_Shift_Ins",
+  "In_Frame_Del",
+  "In_Frame_Ins",
+  "Splice_Site",
+  "Translation_Start_Site",
+  "Nonstop_Mutation"
+)
+
+maf <- readr::read_tsv(params$somatic_mut_maf, comment = "#", show_col_types = FALSE)
+
+maf_tbl <- maf %>%
+  dplyr::filter(Variant_Classification %in% coding_classes) %>%
+  dplyr::mutate(
+    caller_n = stringr::str_count(caller,',') + 1,
+    VAF = t_vaf,
+    Depth = t_depth,
+    Position = paste0(Chromosome, ":", Start_Position),
+    Variant = coalesce(HGVSp_Short, HGVSc, Variant_Classification),
+    Effect = stringr::str_replace_all(Variant_Classification, "_", " ")
+  ) %>%
+  dplyr::transmute(
+    Gene = Hugo_Symbol,
+    Variant,
+    Effect,
+    Position,
+    Ref = Reference_Allele,
+    Alt = Tumor_Seq_Allele2,
+    VAF,
+    Depth,
+    Alt_count = t_alt_count,
+    Caller = caller,
+    Caller_n = caller_n
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(Caller_n),
+    dplyr::desc(VAF)
+  )
+
+caller_badge <- function(caller, caller_n) {
+  if (is.na(caller) || caller == "") return("")
+  
+  bg <- dplyr::case_when(
+    caller_n >= 3 ~ "#16a34a",
+    caller_n == 2 ~ "#2563eb",
+    caller_n == 1 ~ "#ea580c",
+    TRUE ~ "#64748b"
+  )
+  
+  span(
+    title = paste0("Detected by: ", caller, "\nNumber of callers: ", caller_n),
+    style = paste0(
+      "display:inline-block;",
+      "padding:3px 9px;",
+      "border-radius:999px;",
+      "font-size:12px;",
+      "font-weight:700;",
+      "color:white;",
+      "background:", bg, ";",
+      "cursor:help;"
+    ),
+    paste0(caller_n, " caller", ifelse(caller_n > 1, "s", ""))
+  )
+}
+
+effect_badge <- function(effect) {
+  bg <- dplyr::case_when(
+    stringr::str_detect(effect, "Nonsense|Frame Shift|Splice") ~ "#dc2626",
+    stringr::str_detect(effect, "Missense|In Frame") ~ "#2563eb",
+    stringr::str_detect(effect, "Silent|Synonymous") ~ "#64748b",
+    TRUE ~ "#475569"
+  )
+  
+  span(
+    style = paste0(
+      "display:inline-block;",
+      "padding:3px 8px;",
+      "border-radius:6px;",
+      "font-size:12px;",
+      "font-weight:600;",
+      "color:white;",
+      "background:", bg, ";"
+    ),
+    effect
+  )
+}
+
+vaf_bar <- function(value) {
+  if (is.na(value)) return("")
+  
+  pct <- value * 100
+  div(
+    style = "display:flex;align-items:center;gap:8px;",
+    div(
+      style = "
+        width:90px;
+        height:9px;
+        background:#e5e7eb;
+        border-radius:999px;
+        overflow:hidden;
+      ",
+      div(
+        style = paste0(
+          "height:100%;",
+          "width:", max(0, min(pct, 100)), "%;",
+          "background:#1e3a8a;",
+          "border-radius:999px;"
+        )
+      )
+    ),
+    span(sprintf("%.1f%%", pct))
+  )
+}
+div(
+  style = "
+    width: 90%;
+    margin: 20px auto;
+  ",
+reactable(
+  maf_tbl,
+  searchable = TRUE,
+  filterable = TRUE,
+  sortable = TRUE,
+  defaultSorted = list(
+    Caller_n = "desc",
+    VAF = "desc"
+  ),
+  striped = TRUE,
+  highlight = TRUE,
+  compact = TRUE,
+  defaultPageSize = 15,
+  columns = list(
+    Gene = colDef(
+      minWidth = 90,
+      style = list(
+        fontStyle = "italic",
+        fontWeight = "700"
+      )
+    ),
+    Variant = colDef(
+      minWidth = 120,
+      cell = function(value) {
+        span(
+          title = value,
+          style = "
+            font-weight:700;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            display:inline-block;
+            max-width:160px;
+            cursor:help;
+          ",
+          value
+        )
+      }
+    ),
+    Effect = colDef(
+      minWidth = 150,
+      cell = effect_badge
+    ),
+    Position = colDef(minWidth = 140),
+    Ref = colDef(maxWidth = 70),
+    Alt = colDef(maxWidth = 70),
+    VAF = colDef(
+      minWidth = 150,
+      cell = vaf_bar
+    ),
+    Depth = colDef(maxWidth = 80, align = "right"),
+    Alt_count = colDef(name = "Alt reads", maxWidth = 90, align = "right"),
+    Caller = colDef(
+      show = FALSE
+    ),
+    Caller_n = colDef(
+      name = "Caller support",
+      minWidth = 130,
+      cell = function(value, index) {
+        caller_badge(maf_tbl$Caller[index], value)
+      }
+    )
+  ),
+  theme = reactableTheme(
+    borderColor = "#e5e7eb",
+    stripedColor = "#f8fafc",
+    highlightColor = "#eef6ff",
+    cellPadding = "8px 10px",
+    style = list(
+      fontFamily = "Arial, Helvetica, sans-serif",
+      fontSize = "13px"
+    ),
+    headerStyle = list(
+      background = "#0f5a2e",
+      color = "white",
+      fontWeight = "700"
+    )
+  )
+),
+)
+```

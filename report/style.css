@@ -1,0 +1,354 @@
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: #172033;
+  background:
+    linear-gradient(180deg, #f5f8fb 0, #ffffff 360px),
+    #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.main-container {
+  max-width: 1400px !important;
+  margin: 28px auto 56px;
+  padding: 28px 36px 48px;
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  box-shadow: 0 18px 45px rgba(20, 44, 75, 0.08);
+}
+
+.main-container > h1.title {
+  margin: 0 -36px 30px;
+  padding: 34px 40px 32px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #123b5d 0%, #1f6f64 100%);
+  border-radius: 8px 8px 0 0;
+  font-size: 30px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: #12324f;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.section > h1,
+.section > h2,
+.section > h3,
+.section > h4,
+.section > h5,
+.section > p,
+.section > ul,
+.section > ol,
+.section > details,
+.section > pre,
+.section > blockquote,
+.section > div:not(.section),
+.section > .html-widget,
+.section > .reactable,
+.section > .datatables,
+.section > .dataTables_wrapper,
+.section > .gt_table,
+.section > .kable_wrapper,
+.section > .table-responsive {
+  width: 90% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box;
+}
+
+.section > .section {
+  width: 100%;
+}
+
+.section.level1 > h1 {
+  margin-top: 34px;
+  padding: 15px 18px;
+  background: #eef5f8;
+  border-left: 6px solid #1f6f64;
+  border-radius: 6px;
+  font-size: 24px;
+}
+
+.section.level2 > h2 {
+  margin-top: 30px;
+  padding: 0 0 8px;
+  background: transparent;
+  border-left: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #d9e2ec;
+  border-radius: 0;
+  font-size: 20px;
+}
+
+.section.level3 > h3,
+.section.level4 > h4 {
+  margin-top: 24px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #28516d;
+  font-size: 16px;
+}
+
+.header-section-number {
+  color: #1f6f64;
+  font-weight: 800;
+  margin-right: 8px;
+}
+
+p {
+  color: #334155;
+}
+
+a {
+  color: #176b87;
+}
+
+a:hover,
+a:focus {
+  color: #0f4f64;
+}
+
+details {
+  margin: 16px 0 22px;
+  padding: 0;
+  background: #f8fbfd;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+details[open] {
+  box-shadow: 0 10px 24px rgba(20, 44, 75, 0.06);
+}
+
+summary {
+  padding: 11px 15px;
+  color: #12324f;
+  background: #edf6f4;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+details > *:not(summary) {
+  margin-left: 16px;
+  margin-right: 16px;
+}
+
+details > :last-child {
+  margin-bottom: 16px;
+}
+
+pre,
+code {
+  color: #0f2537;
+  background: #eef5f8;
+  border-radius: 4px;
+}
+
+pre {
+  border: 1px solid #d9e2ec;
+}
+
+img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+p > img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tabset-dropdown > .nav-tabs,
+.nav-tabs {
+  border-bottom-color: #cbd8e3;
+}
+
+.nav-tabs > li > a {
+  color: #28516d;
+  border-radius: 6px 6px 0 0;
+}
+
+.nav-tabs > li.active > a,
+.nav-tabs > li.active > a:hover,
+.nav-tabs > li.active > a:focus {
+  color: #12324f;
+  background-color: #edf6f4;
+  border-color: #cbd8e3 #cbd8e3 transparent;
+  font-weight: 700;
+}
+
+.navbar-brand {
+  padding: 5px 15px;
+}
+
+.dropdown:hover > .dropdown-menu {
+  display: block;
+}
+
+.dropdown > .dropdown-toggle:active {
+  pointer-events: none;
+}
+
+table {
+  background: #ffffff;
+}
+
+table.dataTable {
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+table.dataTable thead th,
+table.dataTable thead td {
+  color: #ffffff;
+  background: #123b5d;
+  border-bottom: 0;
+}
+
+table.dataTable tbody td {
+  vertical-align: top;
+}
+
+table.dataTable.stripe tbody tr.odd,
+table.dataTable.display tbody tr.odd {
+  background-color: #f8fbfd;
+}
+
+table.dataTable.hover tbody tr:hover,
+table.dataTable.display tbody tr:hover {
+  background-color: #edf6f4;
+}
+
+.dataTables_wrapper {
+  margin: 18px 0 28px;
+}
+
+.dataTables_wrapper .dataTables_filter input,
+.dataTables_wrapper .dataTables_length select {
+  border: 1px solid #cbd8e3;
+  border-radius: 5px;
+  padding: 4px 8px;
+  background: #ffffff;
+}
+
+.dataTables_wrapper .dt-buttons .dt-button {
+  color: #ffffff !important;
+  background: #176b87 !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  box-shadow: none !important;
+}
+
+.reactable {
+  margin: 18px 0 28px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(20, 44, 75, 0.06);
+}
+
+.rt-table {
+  border-color: #d9e2ec !important;
+}
+
+.rt-thead,
+.rt-th {
+  font-weight: 700 !important;
+}
+
+.rt-td,
+.rt-th {
+  border-color: #e5edf3 !important;
+}
+
+.gt_table {
+  border: 1px solid #d9e2ec !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(20, 44, 75, 0.05);
+}
+
+.kable_wrapper,
+.table-responsive {
+  margin: 18px 0 28px;
+}
+
+blockquote {
+  color: #40566d;
+  background: #f8fbfd;
+  border-left: 5px solid #6aa69b;
+  border-radius: 0 6px 6px 0;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  .main-container {
+    margin: 0;
+    padding: 18px 14px 34px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .main-container > h1.title {
+    margin: -18px -14px 24px;
+    padding: 26px 18px 24px;
+    border-radius: 0;
+    font-size: 24px;
+  }
+
+  .section > h1,
+  .section > h2,
+  .section > h3,
+  .section > h4,
+  .section > h5,
+  .section > p,
+  .section > ul,
+  .section > ol,
+  .section > details,
+  .section > pre,
+  .section > blockquote,
+  .section > div:not(.section),
+  .section > .html-widget,
+  .section > .reactable,
+  .section > .datatables,
+  .section > .dataTables_wrapper,
+  .section > .gt_table,
+  .section > .kable_wrapper,
+  .section > .table-responsive {
+    width: 100% !important;
+  }
+
+  .section.level1 > h1 {
+    padding: 12px 14px;
+    font-size: 21px;
+  }
+
+  .section.level2 > h2 {
+    font-size: 18px;
+  }
+  
+  h3 .header-section-number,
+  h4 .header-section-number,
+  h5 .header-section-number,
+  h6 .header-section-number {
+    display: none;
+  }
+}

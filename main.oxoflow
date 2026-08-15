@@ -1,0 +1,106 @@
+# oxo-flow port of clindet (zyllifeworld/clindet @ 582a9131)
+# Clinical WES tumor/normal variant calling pipeline: fastp -> bwa+fixmate ->
+# markdup -> SNV callers (Mutect2/vardict/varscan2/MuSE/HaplotypeCaller) ->
+# germline callers (Strelka2+Manta, CaVEMan) -> vcf_norm -> vcf2maf (VEP) ->
+# merged MAF -> mutation flagging -> cancer report + MultiQC.
+
+[workflow]
+name = "oxo-flow-clindet"
+version = "1.0.0"
+description = "Clinical WES pipeline ported from zyllifeworld/clindet (default paired WES path)"
+author = "oxo-flow-community"
+pairs_file = "samplesheet.csv"
+format_version = "1.0"
+
+# ---------------------------------------------------------------------------
+# Project / genome (upstream: config['project'] + config['genome_version'])
+# ---------------------------------------------------------------------------
+[config]
+output_dir = "mini_test"
+genome_version = "hg38_chr21"
+
+# Reads (upstream samplesheet columns Tumor_R1_file_path / Normal_R1_file_path ...)
+tumor_fastq_r1 = "test/fixtures/reads/mini-T_R1.fq.gz"
+tumor_fastq_r2 = "test/fixtures/reads/mini-T_R2.fq.gz"
+normal_fastq_r1 = "test/fixtures/reads/mini-NC_R1.fq.gz"
+normal_fastq_r2 = "test/fixtures/reads/mini-NC_R2.fq.gz"
+
+# Resources (upstream: config['resources'][genome_version])
+reference = "test/fixtures/refs/sequence/Homo_sapiens_assembly38_chr21.fasta"
+reference_dict = "test/fixtures/refs/sequence/Homo_sapiens_assembly38_chr21.dict"
+target_bed = "test/fixtures/bed/exome_target_hg38_chr21.bed"
+dbsnp = "test/fixtures/refs/annotations/dbsnp_146.hg38_chr21.vcf.gz"
+dbsnp_indel = "test/fixtures/refs/annotations/Mills_and_1000G_gold_standard.indels.hg38_chr21.vcf.gz"
+# MuSE sump needs a gzipped dbSNP
+dbsnp_gz = "test/fixtures/refs/annotations/dbsnp_146.hg38_chr21.vcf.gz"
+# Mutect2 GetPileupSummaries sites + germline resource
+mutect2_vcf = "test/fixtures/refs/annotations/gnomAD.r2.1.1.GRCh38.PASS.AC.AF.only_chr21.vcf.gz"
+mutect2_germline_vcf = "test/fixtures/refs/annotations/gnomAD.r2.1.1.GRCh38.PASS.AC.AF.only_chr21.vcf.gz"
+# Upstream hg38_chr21 has no panel of normals (WES_PON: null) — leave empty
+wes_pon = ""
+
+# Caller lists (upstream run_params)
+somatic_caller_list = ["HaplotypeCaller", "vardict", "varscan2", "muse", "Mutect2"]
+germ_caller_list = ["strelkamanta", "caveman"]
+
+# vcf2maf / VEP (upstream: config['softwares_params'][genome_version]['vcf2maf'])
+ncbi_build = "GRCh38"
+vep_data = "resources/ref_genome/hg38/vep"
+vep_cache_version = "110"
+vep_species = "homo_sapiens"
+
+# Java temp dir (upstream: config['params']['java']['temp_directory'])
+java_temp_dir = "/tmp"
+
+# Report stages (upstream `stages`): case_report + multiqc are ON in the port
+# default; set run_report = false to match the upstream mini-test default.
+run_report = true
+
+# BED tracks used by mutation_flag — name/path TSV mirroring upstream
+# softwares_params[genome].annotate_beds dict (empty = header-only, no flags)
+annotate_beds_file = ""
+
+# Engine-injected list of pair ids (used by expand_inputs gather rules)
+pair_ids = ["mini"]
+
+# ---------------------------------------------------------------------------
+# Includes
+# ---------------------------------------------------------------------------
+[[include]]
+path = "rules/00_common.oxoflow"
+
+[[include]]
+path = "rules/10_somatic_callers.oxoflow"
+
+[[include]]
+path = "rules/20_germline.oxoflow"
+
+[[include]]
+path = "rules/30_vcf_norm.oxoflow"
+
+[[include]]
+path = "rules/40_vcf2maf.oxoflow"
+
+[[include]]
+path = "rules/50_merge.oxoflow"
+
+[[include]]
+path = "rules/60_report.oxoflow"
+
+# ---------------------------------------------------------------------------
+# Target: merged somatic + germline MAF, flagged MAF, cancer report, MultiQC.
+# (Deviation from upstream mini-test default [stages=call_mut_vcf]: the port
+# target additionally builds the germline MAF, mutation flagging and the two
+# reports — see README Fidelity.)
+# ---------------------------------------------------------------------------
+[[rules]]
+name = "all"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.maf", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_report.html", variables = { pair_id = "config.pair_ids" } }
+]
+output = ["{config.output_dir}/{config.genome_version}/results/all.done"]
+shell = "touch {output[0]}"

@@ -1,0 +1,259 @@
+# Somatic SNV/indel callers, ported verbatim from upstream
+# workflow/WES/rules/rtm/paired/SNV/{HaplotypeCaller,vardict,varscan2,Muse,Mutect2}.smk.
+# Files land in results/vcf/paired/{sample}/{caller}.vcf exactly as upstream.
+
+[workflow]
+name = "somatic_callers"
+
+# ------------------------------------------------------ HaplotypeCaller ----
+[[rules]]
+name = "call_variants_HaplotypeCaller"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    ref = "{config.reference}",
+    bed = "{config.target_bed}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/HaplotypeCaller.vcf" ]
+resources = { threads = 10 }
+description = "GATK HaplotypeCaller joint tumor+normal"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk HaplotypeCaller -R {input.ref} -I {input.Tum} -I {input.NC} -O {output[0]} --intervals {input.bed} --native-pair-hmm-threads {threads} --annotate-with-num-discovered-alleles -A UniqueAltReadCount -A ReferenceBases -A PossibleDeNovo -A Coverage -A DepthPerAlleleBySample -A DepthPerSampleHC -A StrandBiasBySample -A StrandOddsRatio"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+# ----------------------------------------------------------------- vardict ----
+[[rules]]
+name = "vardict_paired_mode"
+input = {
+    reference = "{config.reference}",
+    regions = "{config.target_bed}",
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    normal = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/vardict_raw.vcf" ]
+resources = { threads = 10 }
+description = "VarDict-java paired mode with testsomatic.R + var2vcf_paired.pl"
+shell = """vardict-java -G {input.reference} -th {threads} -c 1 -S 2 -E 3 -g 4 -f 0.01 -N '{pair_id}_T|{pair_id}_NC' -b "{input.bam}|{input.normal}" {input.regions} | testsomatic.R | var2vcf_paired.pl -N '{pair_id}_T|{pair_id}_NC' -f 0.01 > {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/vardict-java%3A1.8.3--hdfd78af_0"
+
+[[rules]]
+name = "vardict_filter_somatic"
+input = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/vardict_raw.vcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/vardict.vcf" ]
+description = "keep StrongSomatic/LikelySomatic PASS calls (upstream vardict_filter_somatic)"
+shell = """bcftools view -i '(INFO/STATUS~"StrongSomatic" || INFO/STATUS~"LikelySomatic") && FILTER="PASS" && INFO/SSF <= 0.05' {input[0]} > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ---------------------------------------------------------------- varscan2 ----
+[[rules]]
+name = "varscan2_mpileup"
+input = {
+    ref = "{config.reference}",
+    normal = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    tumor = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    regions = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.mp",
+    "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.mp"
+]
+resources = { threads = 2 }
+description = "samtools mpileup for varscan2"
+shell = """samtools mpileup -q 1 -Q 1 -f {input.ref} -l {input.regions} {input.normal} > {output[0]}
+samtools mpileup -q 1 -Q 1 -f {input.ref} -l {input.regions} {input.tumor} > {output[1]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_call"
+input = {
+    ref = "{config.reference}",
+    normal = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.mp",
+    tumor = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.mp",
+    regions = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.vcf"
+]
+log = "{config.output_dir}/{config.genome_version}/logs/varscan2/paired/{pair_id}.log"
+description = "varscan somatic (upstream varscan2_call)"
+shell = """varscan somatic {input.normal} {input.tumor} --output-snp {output[0]} --output-indel {output[1]} --output-vcf 1 --strand-filter 1"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_processSomatic"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.vcf"
+]
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Somatic.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Somatic.hc.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.LOH.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.LOH.hc.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Germline.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Germline.hc.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.Somatic.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.Somatic.hc.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.LOH.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.LOH.hc.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.Germline.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.Germline.hc.vcf"
+]
+description = "varscan processSomatic on snp+indel (upstream varscan2_processSomatic)"
+shell = """varscan processSomatic {input[0]}
+varscan processSomatic {input[1]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_som_filter"
+input = {
+    indel = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.vcf",
+    snp_som_hc = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Somatic.hc.vcf"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Somatic.hc.filter.vcf" ]
+description = "varscan somaticFilter (upstream varscan2_som_filter)"
+shell = """varscan somaticFilter {input.snp_som_hc} --indel-file {input.indel} --output-file {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_merge_somatic"
+input = {
+    snp = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Somatic.hc.filter.vcf",
+    indel = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.Somatic.hc.vcf"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.vcf" ]
+description = "bgzip+tabix+concat snp/indel into varscan2.vcf (upstream varscan2_merge_somatic)"
+shell = """bgzip {input.snp} -k -o {input.snp}.gz
+tabix {input.snp}.gz
+bgzip {input.indel} -k -o {input.indel}.gz
+tabix {input.indel}.gz
+bcftools concat -a {input.snp}.gz {input.indel}.gz | bcftools sort -Ou | bcftools view -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------------------- MuSE ----
+[[rules]]
+name = "muse_call"
+input = {
+    reference = "{config.reference}",
+    regions = "{config.target_bed}",
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/{pair_id}.MuSE.txt" ]
+resources = { threads = 10 }
+description = "MuSE call (upstream muse_call)"
+shell = """if [ -x /MuSE/bin/MuSE ]; then
+    MUSE_BIN=/MuSE/bin/MuSE
+elif command -v MuSE >/dev/null 2>&1; then
+    MUSE_BIN=MuSE
+else
+    echo "ERROR: Cannot find MuSE executable. Tried /MuSE/bin/MuSE and MuSE in PATH." >&2
+    exit 1
+fi
+$MUSE_BIN call -f {input.reference} -O {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/{pair_id} -n {threads} {input.Tum} {input.NC}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/muse%3A2.1.2--h3b3e331_3"
+
+[[rules]]
+name = "muse_sump"
+input = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/{pair_id}.MuSE.txt" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/muse.vcf" ]
+resources = { threads = 10 }
+description = "MuSE sump with dbSNP (upstream muse_sump)"
+shell = """if [ -x /MuSE/bin/MuSE ]; then
+    MUSE_BIN=/MuSE/bin/MuSE
+elif command -v MuSE >/dev/null 2>&1; then
+    MUSE_BIN=MuSE
+else
+    echo "ERROR: Cannot find MuSE executable. Tried /MuSE/bin/MuSE and MuSE in PATH." >&2
+    exit 1
+fi
+$MUSE_BIN sump -I {input[0]} -O {output[0]} -E -n {threads} -D {config.dbsnp_gz}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/muse%3A2.1.2--h3b3e331_3"
+
+# ---------------------------------------------------------------- Mutect2 ----
+# Full upstream chain M2_ST -> M2_SNC -> M2_contam -> mutect2 (+ M2_filter).
+# Upstream mini-test consumes the raw Mutect2.vcf (caller list entry 'Mutect2');
+# M2_filter's Mutect2_filter.vcf is kept as an available rule (not on the
+# default path) exactly as in the upstream mini-test DAG.
+[[rules]]
+name = "M2_ST"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    vcf = "{config.mutect2_vcf}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-T_pileupsummaries.table" ]
+resources = { threads = 10 }
+description = "Mutect2 GetPileupSummaries on tumor"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk GetPileupSummaries -R {config.reference} -I {input.Tum} -V {input.vcf} -L {config.target_bed} -O {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "M2_SNC"
+input = {
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    vcf = "{config.mutect2_vcf}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-NC_pileupsummaries.table" ]
+resources = { threads = 10 }
+description = "Mutect2 GetPileupSummaries on normal"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk GetPileupSummaries -R {config.reference} -I {input.NC} -V {input.vcf} -L {config.target_bed} -O {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "M2_contam"
+input = {
+    T = "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-T_pileupsummaries.table",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-NC_pileupsummaries.table"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/recal/contam/{pair_id}/{pair_id}_segments.table",
+    "{config.output_dir}/{config.genome_version}/results/recal/contam/{pair_id}/{pair_id}_calculatecontamination.table"
+]
+resources = { threads = 10 }
+description = "Mutect2 CalculateContamination (upstream M2_contam)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CalculateContamination -I {input.T} -matched {input.NC} -tumor-segmentation {output[0]} -O {output[1]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "mutect2"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Mutect2.vcf" ]
+resources = { threads = 10 }
+description = "GATK Mutect2 joint tumor+normal (-pon only when a PON is configured)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && if [ -n "{config.wes_pon}" ]; then PON_ARG="-pon {config.wes_pon}"; else PON_ARG=""; fi && gatk Mutect2 -R {config.reference} --native-pair-hmm-threads {threads} -I {input.Tum} -I {input.NC} -O {output[0]} -normal {pair_id}_NC $PON_ARG --germline-resource {config.mutect2_germline_vcf} --intervals {config.target_bed}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "M2_filter"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    ref = "{config.reference}",
+    bed = "{config.target_bed}",
+    vcf = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Mutect2.vcf",
+    ctam = "{config.output_dir}/{config.genome_version}/results/recal/contam/{pair_id}/{pair_id}_calculatecontamination.table",
+    seg = "{config.output_dir}/{config.genome_version}/results/recal/contam/{pair_id}/{pair_id}_segments.table"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Mutect2_filter.vcf" ]
+resources = { threads = 10 }
+description = "FilterMutectCalls (upstream M2_filter; not on the default mini-test path)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk FilterMutectCalls -R {input.ref} -V {input.vcf} --contamination-table {input.ctam} --stats {input.vcf}.stats --tumor-segmentation {input.seg} -O {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"

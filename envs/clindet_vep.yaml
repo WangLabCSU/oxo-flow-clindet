@@ -1,0 +1,9 @@
+# Ported verbatim from upstream envs/clindet_vep.yaml.
+name: clindet_vep
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bioconda::vcf2maf=1.6.22
+  - bioconda::ensembl-vep=114.2

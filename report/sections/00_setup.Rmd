@@ -1,0 +1,29 @@
+```{r load_pkgs}
+# Bioconductor
+# library(BSgenome, include.only = "BSgenome")
+# library(MutationalPatterns, include.only = "read_vcfs_as_granges")
+# ref_genome <- "BSgenome.Hsapiens.UCSC.hg19"
+# library(ref_genome, character.only = TRUE, include.only = ref_genome)
+# tx_ref_genome <- "TxDb.Hsapiens.UCSC.hg19.knownGene"
+# library(tx_ref_genome, character.only = TRUE, include.only = tx_ref_genome)
+# CRAN
+library(details, include.only = "details")
+library(DT, include.only = "datatable")
+library(dplyr)
+library(glue, include.only = "glue")
+library(gt, include.only = "gt")
+library(ggplot2, include.only = "ggtitle")
+library(knitr)
+library(kableExtra, include.only = "kable_styling")
+library(patchwork)
+library(purrr, include.only = "map")
+library(readr, include.only = "read_tsv")
+library(rmarkdown, include.only = "render")
+library(tidyr, include.only = "pivot_longer")
+library(tidyverse)
+library(reactable)
+library(htmltools)
+library(gpgr)
+```
+
+

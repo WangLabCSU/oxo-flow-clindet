@@ -1,0 +1,126 @@
+## **Patient, tumour and sample characteristics** {#clin-info}
+
+This section summarises the basic clinical and sample metadata for the case.
+If `params$patient_csv` is provided, the values in that file are used to fill
+the table below. Any missing field, empty value, or unavailable file is shown
+as `UNKNOWN`.
+
+```{r patient_info_setup, include=FALSE}
+library(htmltools)
+library(reactable)
+library(purrr)
+patient_fields <- c(
+  "Hospital",
+  "Patient number",
+  "Date of birth",
+  "Tissue ID",
+  "Date of sampling",
+  "Sampling anatomical site",
+  "Sample type",
+  "Histological cancer type",
+  "Tumour cell content",
+  "Sample ID(s)",
+  "Matched normal DNA",
+  "Source of normal"
+)
+
+patient_summary_template <- dplyr::tibble(
+  variable = patient_fields,
+  value = rep("UNKNOWN", length(patient_fields))
+)
+
+read_patient_info <- function(path) {
+  if (is.null(path) || !nzchar(path) || !file.exists(path)) {
+    return(patient_summary_template)
+  }
+
+  patient_raw <- readr::read_csv(path, show_col_types = FALSE, progress = FALSE)
+
+  if (nrow(patient_raw) == 0L || ncol(patient_raw) < 2L) {
+    return(patient_summary_template)
+  }
+
+  if (all(c("variable", "value") %in% names(patient_raw))) {
+    patient_kv <- patient_raw |>
+      dplyr::select(variable, value)
+  } else if (all(c("field", "value") %in% names(patient_raw))) {
+    patient_kv <- patient_raw |>
+      dplyr::transmute(variable = field, value = value)
+  } else {
+    patient_kv <- patient_raw |>
+      dplyr::select(1, 2) |>
+      rlang::set_names(c("variable", "value"))
+  }
+
+  patient_kv <- patient_kv |>
+    dplyr::mutate(
+      variable = trimws(as.character(variable)),
+      value = trimws(as.character(value))
+    ) |>
+    dplyr::filter(!is.na(variable), variable != "")
+
+  lookup <- patient_kv |>
+    dplyr::distinct(variable, .keep_all = TRUE) |>
+    tibble::deframe()
+
+  patient_summary_template |>
+    dplyr::mutate(
+      value = dplyr::coalesce(unname(lookup[variable]), value),
+      value = dplyr::if_else(is.na(value) | !nzchar(value), "UNKNOWN", value)
+    )
+}
+
+pt_summary <- read_patient_info(params$patient_csv)
+
+summary_cards <- div(
+  style = "
+    width: 90%;
+    margin: 20px auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  ",
+  purrr::pmap(
+    pt_summary,
+    function(variable, value, ...) {
+      div(
+        style = "
+          display: flex;
+          flex-direction: column;
+          border-radius: 10px;
+          overflow: hidden;
+          background: white;
+          border: 1px solid #e5e7eb;
+        ",
+        
+        div(
+          style = "
+            background: #1e3a8a;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 4px 6px;
+            text-align: center;
+          ",
+          variable
+        ),
+        
+        div(
+          style = "
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #0f172a;
+          ",
+          value
+        )
+      )
+    }
+  )
+)
+```
+
+```{r patient_info_table, echo=FALSE, results='asis'}
+summary_cards
+```

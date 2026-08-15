@@ -1,0 +1,12 @@
+# Ported verbatim from upstream envs/strelka.yaml.
+name: strelka
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - strelka
+  - manta
+  - tabix
+  - libboost=1.85.0
+  # libboost version must be 1.85.0 or lower

@@ -1,0 +1,725 @@
+## **Mapping QC** {#mapqc}
+
+### **BAM mapping QC**
+
+<details>
+<summary>Description</summary>
+
+__BAM QC Summary (NGS-bit mapQC)__
+
+This section summarizes sequencing and alignment quality metrics derived
+from BAM files. These metrics reflect the overall data quality, mapping
+performance, coverage characteristics, and potential technical biases.
+
+A 'WARN' or 'FAIL' interpretation may be considered under the following
+general conditions (thresholds can be adjusted based on assay design):
+
+
+__Read processing & mapping__
+
+* `trimmed base percentage`  
+  Fraction of bases removed during read trimming.  
+  High values may indicate poor raw read quality or adapter contamination.
+
+* `clipped base percentage`  
+  Fraction of bases soft/hard clipped during alignment.  
+  Elevated levels may reflect mapping issues or structural variation.
+
+* `mapped read percentage`  
+  Percentage of reads successfully aligned to the reference genome.  
+  - Expected: >95%  
+  - Low values may indicate contamination or poor sequencing quality.
+
+* `properly-paired read percentage`  
+  Percentage of read pairs aligned in proper orientation.  
+  - Expected: >90%  
+  - Low values may indicate library prep issues.
+
+* `duplicate read percentage`  
+  Fraction of PCR/optical duplicates.  
+  - Expected: <40%  
+  - High duplication reduces effective coverage.
+
+
+__Target enrichment & coverage__
+
+* `on-target read percentage`  
+  Fraction of reads mapping to target regions.  
+  - Reflects capture efficiency.
+
+* `near-target read percentage`  
+  Fraction of reads mapping near target regions.  
+  - Useful for evaluating capture specificity.
+
+* `target region read depth`  
+  Average sequencing depth across target regions.  
+  - Key determinant of variant detection sensitivity.
+
+* `target region read depth (no ol)`  
+  Depth excluding overlapping reads.  
+  - Provides a more conservative estimate.
+
+* `bases usable (MB)`  
+  Total number of usable sequenced bases.  
+  - Reflects effective sequencing output.
+
+
+__Coverage uniformity__
+
+* `target region 10x/20x/30x/50x/60x/100x/200x/500x percentage`  
+  Percentage of target bases covered at ≥X depth.  
+  - Used to assess coverage completeness.
+
+* `target region half depth percentage`  
+  Fraction of regions with depth ≥50% of mean coverage.  
+  - Indicates coverage uniformity.
+
+
+__Fragment & insert size__
+* `insert size`  
+  Average fragment length.  
+  - Deviations may indicate library preparation issues.
+
+__Bias & composition__
+
+* `AT dropout`  
+  Underrepresentation of AT-rich regions.  
+  - High values suggest sequencing bias.
+
+* `GC dropout`  
+  Underrepresentation of GC-rich regions.  
+  - High values indicate GC bias affecting coverage.
+
+
+__Sex chromosome & contamination indicators__
+
+* `chrY/chrX read ratio`  
+  Ratio of reads mapping to chromosome Y vs X.  
+  - Used for sex inference or contamination detection.
+
+__General interpretation guidance__
+
+* High duplication or low mapping rates → potential library or sequencing issues  
+* Low on-target rate → inefficient capture  
+* Low coverage or uneven depth → reduced variant calling sensitivity  
+* High GC/AT dropout → bias in sequencing chemistry  
+* Abnormal chrY/chrX ratio → possible sample swap or contamination  
+
+</details>
+
+```{r bam-qc-tumor-normal, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(stringr)
+library(tibble)
+library(reactable)
+library(htmltools)
+
+read_mapqc <- function(file, sample_type) {
+  readr::read_lines(file) %>%
+    purrr::discard(~ stringr::str_trim(.x) == "") %>%
+    tibble::tibble(raw = .) %>%
+    tidyr::separate(
+      raw,
+      into = c("metric", "value"),
+      sep = ":\\s*",
+      extra = "merge",
+      fill = "right"
+    ) %>%
+    dplyr::mutate(
+      metric = stringr::str_trim(metric),
+      value = as.numeric(value),
+      sample_type = sample_type
+    )
+}
+
+qc_rules <- function(metric, value) {
+
+  dplyr::case_when(
+    metric == "mapped read percentage" & value < 90 ~ "FAIL",
+    metric == "mapped read percentage" & value < 95 ~ "WARN",
+    
+    metric == "properly-paired read percentage" & value < 85 ~ "FAIL",
+    metric == "properly-paired read percentage" & value < 90 ~ "WARN",
+    
+    metric == "on-target read percentage" & value < 50 ~ "FAIL",
+    metric == "on-target read percentage" & value < 60 ~ "WARN",
+    
+    metric == "duplicate read percentage" & value > 60 ~ "FAIL",
+    metric == "duplicate read percentage" & value > 40 ~ "WARN",
+    
+    metric == "target region read depth" & value < 20 ~ "FAIL",
+    metric == "target region read depth" & value < 30 ~ "WARN",
+    
+    metric == "GC dropout" & value > 30 ~ "FAIL",
+    metric == "GC dropout" & value > 20 ~ "WARN",
+    
+    TRUE ~ "PASS"
+  )
+}
+
+tumor_qc <- read_mapqc(params$ngs_bit_mapqc_tumor, "Tumor")
+
+has_normal <- !is.null(params$ngs_bit_mapqc_normal) &&
+  !is.na(params$ngs_bit_mapqc_normal) &&
+  file.exists(params$ngs_bit_mapqc_normal)
+
+qc_long <- tumor_qc
+
+if (has_normal) {
+  normal_qc <- read_mapqc(params$ngs_bit_mapqc_normal, "Normal")
+  qc_long <- dplyr::bind_rows(tumor_qc, normal_qc)
+}
+
+# pivot 后保证 Tumor / Normal 列存在性
+qc_tbl <- qc_long %>%
+  dplyr::mutate(
+    is_percent = stringr::str_detect(metric, regex("percentage|dropout", ignore_case = TRUE)),
+    group = dplyr::case_when(
+      stringr::str_detect(metric, stringr::regex("mapped|paired|duplicate|trimmed|clipped", ignore_case = TRUE)) ~ "Mapping / Reads",
+      stringr::str_detect(metric, stringr::regex("target|depth|usable", ignore_case = TRUE)) ~ "Target / Depth",
+      stringr::str_detect(metric, stringr::regex("insert", ignore_case = TRUE)) ~ "Fragment",
+      stringr::str_detect(metric, stringr::regex("dropout|chrY|chrX|allele", ignore_case = TRUE)) ~ "Bias / Sex / AF",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  dplyr::select(group, metric, sample_type, value, is_percent) %>%
+  tidyr::pivot_wider(
+    names_from = sample_type,
+    values_from = value
+  ) %>%
+  dplyr::arrange(group, metric)
+
+bar_cell <- function(value, is_percent) {
+  if (is.null(value) || is.na(value)) return("")
+  
+  if (isTRUE(is_percent)) {
+    width <- max(0, min(value, 100))
+    div(
+      style = "display:flex;align-items:center;gap:8px;",
+      div(
+        style = "
+          width:110px;
+          height:10px;
+          background:#e5e7eb;
+          border-radius:999px;
+          overflow:hidden;
+        ",
+        div(
+          style = paste0(
+            "height:100%;",
+            "width:", width, "%;",
+            "background:#2563eb;",
+            "border-radius:999px;"
+          )
+        )
+      ),
+      span(sprintf("%.2f%%", value))
+    )
+  } else {
+    span(format(round(value, 2), big.mark = ","))
+  }
+}
+
+# 只给真实存在的列设置 colDef
+qc_columns <- list(
+  group = colDef(name = "Category"),
+  metric = colDef(
+    name = "QC Metric",
+    minWidth = 270,
+    style = list(fontWeight = 600)
+  ),
+  is_percent = colDef(show = FALSE)
+)
+
+if ("Tumor" %in% colnames(qc_tbl)) {
+  qc_columns$Tumor <- colDef(
+    name = "Tumor",
+    minWidth = 230,
+    cell = function(value, index) {
+      bar_cell(value, qc_tbl$is_percent[index])
+    }
+  )
+}
+
+if ("Normal" %in% colnames(qc_tbl)) {
+  qc_columns$Normal <- colDef(
+    name = "Normal",
+    minWidth = 230,
+    cell = function(value, index) {
+      bar_cell(value, qc_tbl$is_percent[index])
+    }
+  )
+}
+
+qc_tbl <- qc_tbl %>%
+  mutate(
+    Tumor_status = qc_rules(metric, Tumor),
+    Normal_status = if ("Normal" %in% colnames(.)) qc_rules(metric, Normal) else NA
+  )
+
+status_badge <- function(x) {
+  if (is.na(x)) return("")
+  
+  bg <- case_when(
+    x == "PASS" ~ "#16a34a",
+    x == "WARN" ~ "#ea580c",
+    x == "FAIL" ~ "#dc2626"
+  )
+  
+  span(
+    style = paste0(
+      "padding:4px 10px;",
+      "border-radius:999px;",
+      "color:white;",
+      "font-weight:700;",
+      "font-size:12px;",
+      "background:", bg
+    ),
+    x
+  )
+}
+
+# div(
+#   style = "
+#     width: 90%;
+#     margin: 20px auto;
+#   ",
+# reactable(
+#   qc_tbl,
+#   groupBy = "group",
+#     theme = reactableTheme(
+#     headerStyle = list(
+#       background = "linear-gradient(90deg, #166534, #22c55e)",
+#       color = "white"
+#     ),borderColor = "#e5e7eb"
+#   ),
+#   columns = list(
+#     metric = colDef(name = "QC Metric"),
+#     Tumor = colDef(
+#       cell = function(value, index) {
+#         tagList(
+#           bar_cell(value, qc_tbl$is_percent[index]),
+#           status_badge(qc_tbl$Tumor_status[index])
+#         )
+#       }
+#     ),
+#     
+#     Tumor_status = colDef(show = FALSE),
+#     Normal = colDef(
+#       show = "Normal" %in% colnames(qc_tbl),
+#       cell = function(value, index) {
+#         tagList(
+#           bar_cell(value, qc_tbl$is_percent[index]),
+#           status_badge(qc_tbl$Normal_status[index])
+#         )
+#       }
+#     )
+#   )
+# ),
+# )
+```
+
+### **Tumor-Normal checkmate QC**
+<details>
+<summary>Description</summary>
+
+**Tumor-Normal Concordance QC**
+
+This section evaluates whether the tumor and matched normal samples are likely derived from the same individual.
+
+The concordance value represents the percentage of informative germline markers showing consistent genotypes between the tumor and normal samples. A high concordance supports correct tumor-normal pairing, while a low concordance may suggest sample mismatch, sample swap, contamination, or insufficient sequencing quality at shared markers.
+
+**Interpretation criteria**
+
+- `PASS`: Concordance ≥ 90%; tumor and normal samples are likely matched.
+- `WARN`: Concordance < 90%; tumor-normal pairing should be reviewed carefully.
+
+**Additional metrics**
+
+- `Markers used`: Number of informative markers used for concordance calculation.
+- `Coverage threshold per marker`: Minimum read depth required for a marker to be included.
+- `Minimum mapping quality`: Minimum mapping quality used during marker evaluation.
+- `Minimum base quality`: Minimum base quality used during marker evaluation.
+
+</details>
+```{r conpair_concordance_qc, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+has_conpair_concordance <- !is.null(params$conpair_concordance) &&
+  !is.na(params$conpair_concordance) &&
+  file.exists(params$conpair_concordance)
+
+if (has_conpair_concordance) {
+
+  conpair_lines <- readr::read_lines(params$conpair_concordance)
+
+  concordance_line <- conpair_lines[str_detect(conpair_lines, "^Concordance:")]
+  marker_line <- conpair_lines[str_detect(conpair_lines, "^Based on")]
+  mapq_line <- conpair_lines[str_detect(conpair_lines, "^Minimum mappinq quality:|^Minimum mapping quality:")]
+  baseq_line <- conpair_lines[str_detect(conpair_lines, "^Minimum base quality:")]
+
+  concordance_value <- concordance_line %>%
+    str_extract("[0-9.]+(?=%)") %>%
+    as.numeric()
+
+  marker_info <- marker_line %>%
+    str_extract("[0-9]+/[0-9]+ markers")
+
+  coverage_threshold <- marker_line %>%
+    str_extract("(?<=threshold : )[0-9]+ reads")
+
+  min_mapping_quality <- mapq_line %>%
+    str_extract("[0-9]+$") %>%
+    as.numeric()
+
+  min_base_quality <- baseq_line %>%
+    str_extract("[0-9]+$") %>%
+    as.numeric()
+
+  concordance_status <- dplyr::case_when(
+    is.na(concordance_value) ~ "NA",
+    concordance_value >= 90 ~ "PASS",
+    concordance_value < 90 ~ "WARN"
+  )
+
+  interpretation <- dplyr::case_when(
+    is.na(concordance_value) ~ "Concordance value could not be parsed.",
+    concordance_value >= 90 ~ "Tumor and normal samples are likely from the same individual.",
+    concordance_value < 90 ~ "Tumor and normal samples may not be matched; possible sample swap or contamination should be checked."
+  )
+
+  conpair_tbl <- tibble::tibble(
+    Metric = c(
+      "Tumor-Normal Concordance",
+      "Markers used",
+      "Coverage threshold per marker",
+      "Minimum mapping quality",
+      "Minimum base quality",
+      "Interpretation"
+    ),
+    Value = c(
+      paste0(sprintf("%.2f", concordance_value), "%"),
+      marker_info,
+      coverage_threshold,
+      as.character(min_mapping_quality),
+      as.character(min_base_quality),
+      interpretation
+    ),
+    Status = c(
+      concordance_status,
+      "",
+      "",
+      "",
+      "",
+      concordance_status
+    )
+  )
+
+  status_badge <- function(status) {
+    if (is.na(status) || status == "") return("")
+
+    bg <- dplyr::case_when(
+      status == "PASS" ~ "#16a34a",
+      status == "WARN" ~ "#f59e0b",
+      status == "FAIL" ~ "#dc2626",
+      TRUE ~ "#6b7280"
+    )
+
+    htmltools::span(
+      style = paste0(
+        "display:inline-block;",
+        "padding:4px 10px;",
+        "border-radius:999px;",
+        "color:white;",
+        "font-weight:700;",
+        "font-size:12px;",
+        "background:", bg, ";"
+      ),
+      status
+    )
+  }
+
+  value_cell <- function(value, index) {
+    metric <- conpair_tbl$Metric[index]
+    status <- conpair_tbl$Status[index]
+
+    if (metric %in% c("Tumor-Normal Concordance", "Interpretation")) {
+      bg <- dplyr::case_when(
+        status == "PASS" ~ "#dcfce7",
+        status == "WARN" ~ "#fef3c7",
+        status == "FAIL" ~ "#fee2e2",
+        TRUE ~ "transparent"
+      )
+
+      color <- dplyr::case_when(
+        status == "PASS" ~ "#166534",
+        status == "WARN" ~ "#92400e",
+        status == "FAIL" ~ "#991b1b",
+        TRUE ~ "#111827"
+      )
+
+      htmltools::span(
+        style = paste0(
+          "display:inline-block;",
+          "padding:4px 8px;",
+          "border-radius:6px;",
+          "font-weight:700;",
+          "background:", bg, ";",
+          "color:", color, ";"
+        ),
+        value
+      )
+    } else {
+      htmltools::span(value)
+    }
+  }
+
+  htmltools::div(
+    style = "
+      width: 90%;
+      margin: 20px auto;
+    ",
+    reactable::reactable(
+      conpair_tbl,
+      pagination = FALSE,
+      bordered = TRUE,
+      striped = TRUE,
+      highlight = TRUE,
+      compact = TRUE,
+      columns = list(
+        Metric = colDef(
+          name = "QC Metric",
+          minWidth = 220,
+          style = list(fontWeight = 700)
+        ),
+        Value = colDef(
+          name = "Value",
+          minWidth = 350,
+          cell = function(value, index) value_cell(value, index)
+        ),
+        Status = colDef(
+          name = "Status",
+          minWidth = 100,
+          cell = function(value) status_badge(value)
+        )
+      ),
+      theme = reactableTheme(
+        borderColor = "#e5e7eb",
+        stripedColor = "#f9fafb",
+        highlightColor = "#f3f4f6",
+        cellPadding = "8px 10px",
+        style = list(
+          fontFamily = "Arial, Helvetica, sans-serif",
+          fontSize = "13px"
+        ),
+        headerStyle = list(
+          background = "#1e3a8a",
+          color = "white",
+          fontWeight = "700"
+        )
+      )
+    )
+  )
+}
+```
+
+### **Purple CNV calling QC**
+
+<details>
+<summary>Description</summary>
+
+__PURPLE Summary__
+
+PURPLE outputs a QC status along with a summary
+for the inferred purity and ploidy of the somatic sample.
+The 'QC Status' field reflects how we have determined the purity of the sample.
+A 'FAIL' or 'WARN' QC status can be attributed to several factors:
+
+* `FAIL_CONTAMINATION`: measured contamination in the tumor (by Amber) is >10%
+* `FAIL_NO_TUMOR`: no evidence of tumor is found in the sample, when all
+  following criteria are satisfied:
+  - tumor has one or more HOTSPOT SV or point mutation
+  - SNV sum(allele read count) > 5000
+  - SV sum(startTumorVariantFragmentSupport) > 1000 (excluding SGL breakends)
+* `WARN_DELETED_GENES`: more than 280 homozygously deleted genes.
+  This sometimes occurs in samples with very high MB scale GC bias, and
+  particularly affects high GC content regions such as CHR 19.
+  It may also indicate a poor fit.
+* `WARN_HIGH_COPY_NUMBER_NOISE`: more than 220 copy number segments __not__
+  supported at either end by SV breakpoints.
+  Indicates samples with extreme GC bias, with differences
+  in depth of >= 10x between high and low GC regions. GC normalisation is
+  unreliable when the corrections are so extreme so it is recommended to fail
+  the sample (concerns with miscalled deletions or amplifications or have
+  poor sensitivity in high GC regions).
+* `WARN_GENDER_MISMATCH`: if the AMBER and COBALT inferred genders are
+  inconsistent then the COBALT one is used but the sample is failed.
+* `WARN_LOW_PURITY`: fitted purity < 20%
+
+</details>
+
+```{r funcs}
+purple_dir <- params$purple_res_dir # should be relative to the knitting directory
+ascat_dir <- params$ascat_res_dir 
+
+blank_lines <- function(n = 10) {
+  cat(rep("&nbsp;  ", n), sep = "\n")
+}
+
+# get js indices when using in DT options
+col_ind_js <- function(dt, col) {
+  ntab <- setNames((1:ncol(dt) - 1), names(dt))
+  stopifnot(all(col %in% names(dt)))
+  sort(unname(ntab[col]))
+}
+```
+
+```{r purple_prep}
+#---- PURPLE QC Table ----#
+purple_qc_summary <- dplyr::bind_rows(
+  gpgr::purple_qc_read(params$purple_qc)[["summary"]] %>%
+    dplyr::filter(!variable %in% c("Purity", "Gender")),
+  gpgr::purple_purity_read(params$purple_purity)[["summary"]]
+)  %>%  dplyr::mutate(
+    value = as.character(value),
+    details = as.character(details)
+  )
+```
+
+```{r purple_qc}
+qc_summary_all <- dplyr::tribble(
+  ~n, ~variable, ~value, ~details,
+  1, "Sample Name", params$tumor_name, "Sample Name of this run",
+  # 20, "CNVs (Somatic)", as.character(glue::glue(
+  #   "Min: {cnv_summary[['som']]$Min}; ",
+  #   "Max: {cnv_summary[['som']]$Max}; ",
+  #   "N: {cnv_summary[['som']]$N} "
+  # )), "",
+  # 17, "SNVs (Somatic)", snv_summary, "Summary SNV counts across main processes, in order",
+  # 19, "SVs (melted)", paste(rev(sv_summary$melted), collapse = ", "),
+  # "Summary of SVs after splitting annotations for each event into a separate variant row.",
+  22, "Genome", params$genome_version, "Human genome assembly used."
+) %>%
+  dplyr::mutate(
+    value = as.character(value),
+    details = as.character(details)
+  ) %>%
+  dplyr::bind_rows(
+    purple_qc_summary
+  ) %>%
+  dplyr::arrange(n) %>%
+  dplyr::select(-n)
+
+```
+```{r summary_tables}
+
+library(dplyr)
+library(reactable)
+library(htmltools)
+
+orange <- "#FED8B1"
+red <- "#FF4646"
+green <- "#dcfce7"
+blue_header <- "#1e3a8a"
+
+qc_summary_all2 <- qc_summary_all %>%
+  mutate(
+    value = as.character(value),
+    details = as.character(details)
+  )
+
+# 拆成左右两个表
+mid <- ceiling(nrow(qc_summary_all2) / 2)
+
+qc_left <- qc_summary_all2 %>%
+  slice(1:mid)
+
+qc_right <- qc_summary_all2 %>%
+  slice((mid + 1):n())
+
+value_cell <- function(value, index, data) {
+  variable <- data$variable[index]
+  
+  bg <- dplyr::case_when(
+    variable == "QC_Status" & grepl("FAIL", value) ~ red,
+    variable == "QC_Status" & grepl("WARN_", value) ~ orange,
+    variable == "QC_Status" & grepl("PASS", value) ~ green,
+    variable == "Hypermutated" & grepl("TRUE", value) ~ orange,
+    TRUE ~ "transparent"
+  )
+  
+  span(
+    style = paste0(
+      "display:inline-block;",
+      "padding:3px 8px;",
+      "border-radius:6px;",
+      "font-weight:700;",
+      "background:", bg, ";"
+    ),
+    value
+  )
+}
+
+make_qc_table <- function(dat) {
+  reactable(
+    dat,
+    pagination = FALSE,
+    bordered = TRUE,
+    striped = TRUE,
+    highlight = TRUE,
+    compact = TRUE,
+    columns = list(
+      variable = colDef(
+        name = "Metric",
+        minWidth = 160,
+        cell = function(value, index) {
+          span(
+            title = dat$details[index],
+            style = "font-weight:700; cursor:help;",
+            value
+          )
+        }
+      ),
+      value = colDef(
+        name = "Value",
+        minWidth = 130,
+        cell = function(value, index) value_cell(value, index, dat)
+      ),
+      details = colDef(show = FALSE)
+    ),
+    theme = reactableTheme(
+      borderColor = "#dbeafe",
+      stripedColor = "#eff6ff",
+      highlightColor = "#dbeafe",
+      cellPadding = "6px 8px",
+      style = list(
+        fontFamily = "Arial, Helvetica, sans-serif",
+        fontSize = "12px"
+      ),
+      headerStyle = list(
+        background = blue_header,
+        color = "white",
+        fontWeight = "700"
+      )
+    )
+  )
+}
+
+# div(
+#   style = "
+#     width: 90%;
+#     margin: 20px auto;
+#     display: grid;
+#     grid-template-columns: 1fr 1fr;
+#     gap: 16px;
+#     align-items: start;
+#   ",
+#   make_qc_table(qc_left),
+#   make_qc_table(qc_right)
+# )
+
+```
+
+```{r patient_info_table2, echo=FALSE, results='asis'}
+
+```

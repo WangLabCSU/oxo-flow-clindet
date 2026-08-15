@@ -1,0 +1,5 @@
+## **Report Generation and Reproducibility** {#appendix}
+
+This report was generated automatically using [ClinDet](https://github.com/zyllifeworld/clindet?utm_source=chatgpt.com), an open-source clinical genomics pipeline developed for end-to-end analysis and reporting of high-throughput sequencing data. ClinDet is built on the :contentReference[oaicite:1]{index=1} workflow engine and integrates widely used bioinformatics tools to perform quality control, somatic variant calling, copy number analysis, structural variant detection, and clinical annotation in a fully reproducible manner.
+
+The pipeline supports whole-genome sequencing (WGS), whole-exome sequencing (WES), and transcriptome sequencing (RNA-seq), and produces standardized HTML reports that combine assay quality metrics, molecular findings, and clinically relevant interpretations for precision oncology applications. By automating both computational analysis and result interpretation, ClinDet facilitates robust, transparent, and scalable genomic reporting for research and clinical decision support. :contentReference[oaicite:2]{index=2}

@@ -1,0 +1,104 @@
+---
+output:
+  html_document:
+    theme: cosmo # darkly
+    css: style.css
+    toc: false
+    code_download: false
+    number_sections: true
+    pandoc_args:
+      - "--shift-heading-level-by=-1"
+  rmdformats::material:
+    highlight: kate
+params:
+  ## common config
+  af_keygenes: NULL
+  genome_version: NULL
+  title: "Clindet WES analysis case Report"
+  tumor_name: NULL
+  ## patient and sample info
+  patient_csv: NULL
+  ## Assay QC
+  ngs_bit_sample_gender: NULL
+  conpair_contamination: NULL
+  conpair_concordance: NULL
+  ngs_bit_mapqc_tumor: NULL
+  ngs_bit_mapqc_normal: NULL
+  
+  ## virus reports #######
+  virusbreakend_tsv: NULL
+  virusbreakend_vcf: NULL
+  ## somatic mut MAF ########
+  somatic_mut_maf: NULL
+  ## copy number results ##
+  ascat_res_dir: NULL
+  purple_res_dir: NULL
+  purple_purity: NULL
+  purple_qc: NULL
+  purple_som_cnv: NULL
+  purple_som_gene_cnv: NULL
+  purple_som_snv_vcf: NULL
+  # structural variants results
+  sv_available: NULL
+  somatic_sv_tsv: NULL
+  somatic_sv_vcf: NULL
+  
+  # softwares environment summary
+  conda_list: NULL
+
+description: "Analysis of tumor/normal samples at Clindet"
+title: "`r paste(params$tumor_name, params$title)`"
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r knitr_opts, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE, echo = FALSE,
+  warning = FALSE, message = FALSE,
+  error = TRUE
+) # continue running report even after chunk errors
+
+report_dir <- normalizePath(dirname(knitr::current_input()))
+knitr::opts_knit$set(
+  root.dir = report_dir,
+  output.dir = report_dir
+)
+```
+
+```{r setup, child='sections/00_setup.Rmd'}
+```
+
+```{r patient_info, child='sections/01_patient_info.Rmd'}
+```
+
+
+```{r assay_qc, child='sections/02_assay_qc.Rmd'}
+```
+
+```{r genomic_snv, child='sections/03_genomic_snv.Rmd'}
+```
+
+```{r genomic_cnv, child='sections/03_genomic_cnv.Rmd'}
+```
+
+<!-- ```{r annotation, child='sections/04_annotation.Rmd'} -->
+<!-- ``` -->
+
+<!-- ```{r actionability, child='sections/05_actionability.Rmd'} -->
+<!-- ``` -->
+
+<!-- ```{r summary, child='sections/06_summary.Rmd'} -->
+<!-- ``` -->
+
+```{r appendix, child='sections/07_appendix.Rmd'}
+```
