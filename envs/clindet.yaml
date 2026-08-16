@@ -30,4 +30,5 @@ dependencies:
   - sra-tools
   - pysam
   - pip
+  - ca-certificates
   - bioconductor-tximport
