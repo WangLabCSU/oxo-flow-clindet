@@ -50,6 +50,11 @@ ncbi_build = "GRCh38"
 vep_data = "resources/ref_genome/hg38/vep"
 vep_cache_version = "110"
 vep_species = "homo_sapiens"
+# VEP needs a local cache at {vep_data}/{vep_species} (~10GB download; the
+# fixture kit does not ship it). The vcf2maf rules and the downstream MAF
+# merge/flag/cancer-report tail gate on this flag — set true once the cache
+# is in place (upstream fails hard without it).
+vep_cache_ready = false
 
 # Java temp dir (upstream: config['params']['java']['temp_directory'])
 java_temp_dir = "/tmp"
@@ -106,3 +111,4 @@ expand_inputs = [
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all.done"]
 shell = "touch {output[0]}"
+when = "config.vep_cache_ready"
