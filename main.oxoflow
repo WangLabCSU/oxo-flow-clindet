@@ -29,6 +29,8 @@ normal_fastq_r2 = "test/fixtures/reads/mini-NC_R2.fq.gz"
 reference = "test/fixtures/refs/sequence/Homo_sapiens_assembly38_chr21.fasta"
 reference_dict = "test/fixtures/refs/sequence/Homo_sapiens_assembly38_chr21.dict"
 target_bed = "test/fixtures/bed/exome_target_hg38_chr21.bed"
+# cgpFlagCaVEMan configs (bed-based flags dropped: no chr21 flag data)
+flag_config_dir = "test/fixtures/flag"
 dbsnp = "test/fixtures/refs/annotations/dbsnp_146.hg38_chr21.vcf.gz"
 dbsnp_indel = "test/fixtures/refs/annotations/Mills_and_1000G_gold_standard.indels.hg38_chr21.vcf.gz"
 # MuSE sump needs a gzipped dbSNP

@@ -151,8 +151,9 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman.vcf" ]
 resources = { threads = 20 }
-description = "cgpFlagCaVEMan.pl somatic filtering (upstream CM_flag; flag params empty for hg38_chr21)"
-shell = """cgpFlagCaVEMan.pl -i {input.vcf} -o {output[0]} -m {input.Tum} -n {input.NC} -s {config.genome_version} -t genome -ref {config.reference}.fai -c "" -v "" -u "" -g "" -b "" -umv . -ab """""
+description = "cgpFlagCaVEMan.pl somatic filtering (upstream CM_flag; upstream passes -c/-v/-b/-ab empty and -t genome, all rejected by cgpFlagCaVEMan 1.15.3 — port ships a flag config with the bed-based flags dropped and -t genomic)"
+shell = """mkdir -p {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/flag_beds {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/flag_annos
+cgpFlagCaVEMan.pl -i {input.vcf} -o {output[0]} -m {input.Tum} -n {input.NC} -s {config.genome_version} -t genomic -ref {config.reference}.fai -c {config.flag_config_dir}/{config.genome_version}/flag.vcf.config.ini -v {config.flag_config_dir}/flag.to.vcf.convert.ini -u "" -g "" -b {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/flag_beds -ab {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/flag_annos -umv ."""
 [rules.environment]
 singularity = "docker://quay.io/wtsicgp/cgpcavemanwrapper:1.15.3"
 
