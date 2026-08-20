@@ -1,0 +1,123 @@
+# ============================================================================
+# DRAFT — RNA vcf2maf (VEP) + merged MAF (upstream workflow/RNA/rules/merge_loop.smk).
+# NOT yet live-tested. Reviewed against the live-test cycle before finalizing.
+#
+# Upstream loop_vcf2maf_rna uses a {caller} wildcard + get_vcf_name(); the
+# port unrolls static per-caller rules over config.rna_caller_list (default:
+# freebayes, HaplotypeCaller, lofreq, Mutect2, vardict, varscan2). RNA ids
+# from get_vcf_name (run_type == 'rna'): --tumor-id {sample}
+# --normal-id {sample}_NORMAL.
+#
+# All rules here are gated on config.vep_cache_ready (VEP cache required),
+# matching the DNA port's vcf2maf/merge rules.
+#
+# Upstream gotchas handled here:
+#   - loop_vcf2maf_rna consumes the RAW results/mut/vcf/{pair_id}/{caller}.vcf
+#     dir — NOT the vcf_nf dir (the RNA norm_filter_* rules feed nothing).
+#   - merge_rna_maf declares vcf1+ref inputs the R script never reads —
+#     dropped. The R script assigns snakemake@output[['filter_maf']] which the
+#     upstream rule never defines — harmless under the smk.R shim (NULL).
+#   - The R script writes Tumor_Sample_Barcode = {sample}_T (appends _T).
+#   - Port scripts/merge_maf.R is a patched lineage vs the RNA upstream copy
+#     (adds "Intron" to the Variant_Classification exclusion + NA fil2 fix —
+#     see git diff against workflow/RNA/scripts/merge_maf.R); reuse the port's
+#     patched script and keep the two-line difference documented.
+#   - The R script's Lofreq special-case compares caller == "Lofreq" against
+#     the lowercase "lofreq" filename — never triggers (upstream quirk kept;
+#     harmless because vcf2maf fills the MAF depth columns itself).
+# ============================================================================
+
+[workflow]
+name = "rna_vcf2maf_merge"
+
+# ------------------------------------------------------ per-caller vcf2maf ----
+[[rules]]
+name = "vcf2maf_rna_freebayes"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/freebayes.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/freebayes.vcf.maf" ]
+description = "vcf2maf on freebayes (tumor-id {sample} / normal-id {sample}_NORMAL)"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id} --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_rna_HaplotypeCaller"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/HaplotypeCaller.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/HaplotypeCaller.vcf.maf" ]
+description = "vcf2maf on HaplotypeCaller (tumor-id {sample} / normal-id {sample}_NORMAL)"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id} --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_rna_lofreq"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/lofreq.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/lofreq.vcf.maf" ]
+description = "vcf2maf on lofreq (tumor-id {sample} / normal-id {sample}_NORMAL)"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id} --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_rna_Mutect2"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Mutect2.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/Mutect2.vcf.maf" ]
+description = "vcf2maf on Mutect2 (tumor-id {sample} / normal-id {sample}_NORMAL)"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id} --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_rna_vardict"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/vardict.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/vardict.vcf.maf" ]
+description = "vcf2maf on vardict (tumor-id {sample} / normal-id {sample}_NORMAL)"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id} --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_rna_varscan2"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan2.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/varscan2.vcf.maf" ]
+description = "vcf2maf on varscan2 (tumor-id {sample} / normal-id {sample}_NORMAL)"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id} --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+# ------------------------------------------------------------ merged MAF ----
+[[rules]]
+name = "merge_rna_maf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.rna_caller_list", pair_id = "config.pair_ids" } }
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/merge/{pair_id}.maf" ]
+description = "merge per-caller RNA MAFs (upstream merge_rna_maf + merge_maf.R via the smk.R shim; sample barcode becomes {sample}_T)"
+when = "config.vep_cache_ready"
+shell = """Rscript scripts/smk.R --script scripts/merge_maf.R --input maf1 {input} --param dir {config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id} --output maf {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"

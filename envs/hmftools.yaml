@@ -1,0 +1,8 @@
+# Ported from upstream envs/hmftools.yaml. Only isofox is a consumer on the
+# RNA path (sage/pave are upstream orphans — see rules/rna/50_snv.oxoflow).
+name: hmftools
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - hmftools-isofox=1.7.2

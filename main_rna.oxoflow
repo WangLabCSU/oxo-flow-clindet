@@ -1,0 +1,111 @@
+# oxo-flow port of the clindet RNA sub-workflow (zyllifeworld/clindet @ 582a9131,
+# workflow/RNA + wrapper/rna.smk entry; run_type = rna).
+# RNA-seq variant/fusion pipeline: fastp -> STAR (arriba + mutation maps) ->
+# arriba fusion calling -> SplitNCigarReads -> unpaired SNV callers ->
+# (VEP-gated vcf2maf/MAF merge tail).
+#
+# Upstream default mini-test stages (test_rna.yaml): [arriba, call_mut].
+# The RSEM/kallisto/salmon/TRUST4 quant rules and the isofox rules are NOT in
+# the default stages upstream — run them explicitly with -t (e.g.
+#   oxo-flow run main_rna.oxoflow -t rna_mapping::cal_exp_RSEM
+# and see README "RNA sub-workflow").
+
+[workflow]
+name = "oxo-flow-clindet-rna"
+version = "1.0.0"
+description = "Clinical RNA-seq pipeline ported from zyllifeworld/clindet (workflow/RNA default stages: arriba + call_mut)"
+author = "oxo-flow-community"
+pairs_file = "samplesheet.csv"
+format_version = "1.0"
+
+# ---------------------------------------------------------------------------
+# Project / genome (upstream: config['project'] + config['genome_version'])
+# ---------------------------------------------------------------------------
+[config]
+output_dir = "mini_test/rna"
+genome_version = "hg38_chr21"
+
+# Reads (upstream samplesheet R1_file_path / R2_file_path; the RNA port
+# reuses the DNA fixture mini-T reads — the fixture kit has no RNA-specific
+# reads, and the default stages only need mapped reads)
+rna_fastq_r1 = "test/fixtures/reads/mini-T_R1.fq.gz"
+rna_fastq_r2 = "test/fixtures/reads/mini-T_R2.fq.gz"
+
+# Resources (upstream: config['resources'][genome_version])
+reference = "test/fixtures/refs/sequence/Homo_sapiens_assembly38_chr21.fasta"
+rna_gtf = "test/fixtures/refs/annotations/mini_chr21.gtf"
+target_bed = "test/fixtures/bed/exome_target_hg38_chr21.bed"
+# STAR index built inline by STAR_1_pass when missing (upstream ships a
+# pre-built index; the synthetic fixture reference needs its own)
+star_index = "test/fixtures/refs/star_index"
+# Quant indexes are empty in the upstream hg38_chr21 test config — the
+# RSEM/kallisto/salmon rules only run when explicitly targeted
+rsem_index = ""
+kallisto_index = ""
+salmon_index = ""
+
+# TRUST4 (upstream softwares_params[genome].trust4; git-cloned at rule
+# runtime into trust4_dir when trust4_f is missing — not in default stages)
+trust4_dir = "resources/softwares/TRUST4"
+trust4_ref = "resources/softwares/TRUST4/human_IMGT+C.fa"
+trust4_f = "resources/softwares/TRUST4/hg38_bcrtcr.fa"
+
+# Arriba databases (upstream softwares_params[genome].arriba.database): the
+# blacklist is a local file (upstream ships an empty one); known_fusions /
+# protein_domains / cytobands live INSIDE the uhrigs/arriba:2.4.0 image
+arriba_blacklist = "test/fixtures/refs/annotations/arriba_blacklist.tsv"
+arriba_known_fusions = "/arriba_v2.4.0/database/known_fusions_hg38_GRCh38_v2.4.0.tsv.gz"
+arriba_protein_domains = "/arriba_v2.4.0/database/protein_domains_hg38_GRCh38_v2.4.0.gff3"
+arriba_cytobands = "/arriba_v2.4.0/database/cytobands_hg38_GRCh38_v2.4.0.tsv"
+
+# HMF tools (isofox; excluded for hg38_chr21 upstream — needs the multi-GB
+# hmf_pipeline_resources tree, not shipped in the mini-test)
+hmftools_ensembl_data_dir = ""
+sage_ref_genome_version = "38"
+isofox_mem_mb = 30000
+
+# Caller resources
+mutect2_germline_vcf = "test/fixtures/refs/annotations/gnomAD.r2.1.1.GRCh38.PASS.AC.AF.only_chr21.vcf.gz"
+# Upstream hg38_chr21 has no panel of normals (WES_PON: null) — leave empty
+wes_pon = ""
+
+# vcf2maf / VEP (upstream: config['softwares_params'][genome_version]['vcf2maf'])
+ncbi_build = "GRCh38"
+vep_data = "resources/ref_genome/hg38/vep"
+vep_cache_version = "110"
+vep_species = "homo_sapiens"
+# VEP needs a local cache at {vep_data}/{vep_species} (~10GB download; the
+# fixture kit does not ship it). The vcf2maf rules and the MAF merge gate on
+# this flag — set true once the cache is in place (upstream fails hard
+# without it).
+vep_cache_ready = false
+
+# Java temp dir (upstream: config['params']['java']['temp_directory'])
+java_temp_dir = "/tmp"
+
+# Engine-injected list of pair ids (used by expand_inputs gather rules)
+pair_ids = ["mini"]
+
+# ---------------------------------------------------------------------------
+# Includes
+# ---------------------------------------------------------------------------
+[[include]]
+path = "rules/rna/00_qc.oxoflow"
+
+[[include]]
+path = "rules/rna/10_mapping.oxoflow"
+
+[[include]]
+path = "rules/rna/20_fusion.oxoflow"
+
+[[include]]
+path = "rules/rna/30_isofox.oxoflow"
+
+[[include]]
+path = "rules/rna/40_call_mut.oxoflow"
+
+[[include]]
+path = "rules/rna/50_snv.oxoflow"
+
+[[include]]
+path = "rules/rna/60_vcf2maf_merge.oxoflow"

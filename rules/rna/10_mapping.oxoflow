@@ -1,0 +1,164 @@
+# ============================================================================
+# DRAFT — RNA mapping + quantification (upstream workflow/RNA/rules/mapping.smk).
+# NOT yet live-tested. Reviewed against the live-test cycle before finalizing.
+#
+# Port wildcards: upstream {sample} -> {pair_id}.
+#
+# Upstream gotchas handled here:
+#   - STAR rules build the STAR index inside the rule shell if
+#     {index}/SA|Genome|SAindex is missing (genomeGenerate side effect — kept,
+#     same pattern as the DNA port's inline `bwa index`).
+#   - STAR_arriba_map: upstream trailing-`\` glues `{sj_filt}--sjdbGTFfile`
+#     into a single token (line-continuation bug) — flags split here.
+#   - STAR_mut_map: params.two_pass = '--twopassMode Basic' is never passed to
+#     the shell upstream — two-pass mode does NOT actually run; kept verbatim
+#     (dead param dropped).
+#   - RSEM_sort_genome emits {pair_id}.STAR.genome.sorted.bam; arriba_draw
+#     (20_fusion.oxoflow) waits for .STAR.genome.sort.bam — upstream filename
+#     mismatch; the port points arriba_draw at the file that exists.
+#   - RSEM/kallisto/salmon indexes are empty (null) in the hg38_chr21 test
+#     config and the rules are stage-gated upstream (rna_res_list: only
+#     'arriba' + 'call_mut' in default stages) — the rules are defined but
+#     only run when a stage target requests them and an index is configured.
+# ============================================================================
+
+[workflow]
+name = "rna_mapping"
+
+# ----------------------------------------------------------- STAR 1-pass ----
+[[rules]]
+name = "STAR_1_pass"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_pass1.log",
+    "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/_STARpass1/SJ.filt"
+]
+resources = { threads = 10 }
+description = "STAR 1-pass alignment + splice-junction filter (upstream STAR_1_pass; builds the STAR index inline if missing)"
+shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
+    echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
+    mkdir -p {config.star_index}
+    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference}
+else
+    echo "[STAR index] Existing STAR index found. Skip building."
+fi
+STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype None --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/_STARpass1/ --readFilesIn {input.R1} {input.R2} --readFilesCommand zcat
+awk '$1~/(chr)?[1-2XY]/ && $6==0 && $5>0 && $7>0' {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/_STARpass1/SJ.out.tab > {output[1]}
+touch {output[0]}"""
+[rules.environment]
+conda = "envs/rsem.yaml"
+
+# ---------------------------------------------------- STAR 2-pass (arriba) ----
+[[rules]]
+name = "STAR_arriba_map"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}",
+    sj_filt = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/_STARpass1/SJ.filt"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}.sorted.bam",
+    stamp = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_star.log",
+    um_fq1 = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_unmapped_R1.fq",
+    um_fq2 = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_unmapped_R2.fq"
+}
+resources = { threads = 10 }
+description = "STAR 2nd pass with chimera options for arriba + samtools sort/index (upstream STAR_arriba_map)"
+shell = """STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype BAM Unsorted --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/ --outReadsUnmapped Fastx --sjdbFileChrStartEnd {input.sj_filt} --sjdbGTFfile {config.rna_gtf} --outFilterMultimapNmax 50 --peOverlapNbasesMin 10 --alignSplicedMateMapLminOverLmate 0.5 --alignSJstitchMismatchNmax 5 -1 5 5 --chimSegmentMin 10 --chimOutType WithinBAM HardClip --chimJunctionOverhangMin 10 --chimScoreDropMax 30 --chimScoreJunctionNonGTAG 0 --chimScoreSeparation 1 --chimSegmentReadGapMax 3 --chimMultimapNmax 50 --readFilesIn {input.R1} {input.R2} --readFilesCommand gunzip -c
+samtools sort -@ {threads} -m 1G -o {output.bam} {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/Aligned.out.bam
+samtools index {output.bam}
+mv {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/Unmapped.out.mate1 {output.um_fq1}
+mv {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/Unmapped.out.mate2 {output.um_fq2}
+touch {output.stamp}"""
+[rules.environment]
+conda = "envs/rsem.yaml"
+
+# ------------------------------------------------- STAR re-align (mutation) ----
+[[rules]]
+name = "STAR_mut_map"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/{pair_id}.sorted.bam",
+    unsort_bam = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/Aligned.out.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/{pair_id}.sorted.bam.bai"
+}
+resources = { threads = 10 }
+description = "STAR re-alignment for mutation calling + addreplacerg + sort (upstream STAR_mut_map; upstream two_pass param is dead — no --twopassMode in the shell)"
+shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
+    echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
+    mkdir -p {config.star_index}
+    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference}
+else
+    echo "[STAR index] Existing STAR index found. Skip building."
+fi
+STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype BAM Unsorted --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/ --outReadsUnmapped Fastx --sjdbGTFfile {config.rna_gtf} --alignIntronMax 1000000 --alignIntronMin 20 --alignMatesGapMax 1000000 --alignSJDBoverhangMin 1 --alignSJoverhangMin 8 --alignSoftClipAtReferenceEnds Yes --chimJunctionOverhangMin 15 --chimMainSegmentMultNmax 1 --chimOutJunctionFormat 1 --chimSegmentMin 15 --limitSjdbInsertNsj 1200000 --outFilterIntronMotifs None --outFilterMatchNminOverLread 0.33 --outFilterMismatchNmax 999 --outFilterMismatchNoverLmax 0.1 --outFilterMultimapNmax 20 --outFilterScoreMinOverLread 0.33 --outSAMmapqUnique 60 --readFilesIn {input.R1} {input.R2} --readFilesCommand gunzip -c
+samtools addreplacerg -@ {threads} -r 'ID:{pair_id}' -r 'PL:ILLUMINA.NovaSeq' -r 'LB:RNA-Seq' -r 'SM:{pair_id}' -o {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/Aligned.out.bam
+samtools sort -@ {threads} -m 1G -o {output.bam} {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam
+samtools index {output.bam}
+rm {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam"""
+[rules.environment]
+conda = "envs/rsem.yaml"
+
+# ------------------------------------------------------------ RSEM quant ----
+[[rules]]
+name = "cal_exp_RSEM"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}"
+}
+output = {
+    genes = "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.genes.results",
+    isoforms = "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.isoforms.results",
+    bam = "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.bam",
+    tx_bam = "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.transcript.bam",
+    tx_sort_bam = "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.transcript.sorted.bam"
+}
+resources = { threads = 10 }
+description = "RSEM quantification via STAR (upstream cal_exp_RSEM; stage-gated by 'RSEM' upstream; needs config.rsem_index)"
+shell = """rsem-calculate-expression --paired-end --star -p {threads} --star-output-genome-bam --star-gzipped-read-file --sort-bam-by-coordinate {input.R1} {input.R2} {config.rsem_index} {config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}"""
+[rules.environment]
+conda = "envs/rsem.yaml"
+
+[[rules]]
+name = "RSEM_sort_genome"
+input = [ "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.bam" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.sorted.bam" ]
+resources = { threads = 10 }
+description = "samtools sort+index of RSEM genome BAM (upstream RSEM_sort_genome; temp() upstream, kept persistent here so arriba_draw can consume it)"
+shell = """samtools sort -@ {threads} -m 1G -o {output[0]} {input[0]}
+samtools index {output[0]}"""
+[rules.environment]
+conda = "envs/rsem.yaml"
+
+# ------------------------------------------------------- kallisto / salmon ----
+[[rules]]
+name = "kallisto"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/summary/kallisto/{pair_id}/abundance.tsv" ]
+resources = { threads = 10 }
+description = "kallisto quant (upstream kallisto; stage-gated by 'kallisto' upstream; needs config.kallisto_index)"
+shell = """kallisto quant -i {config.kallisto_index} -o {config.output_dir}/{config.genome_version}/results/summary/kallisto/{pair_id} {input.R1} {input.R2} -t {threads}"""
+[rules.environment]
+conda = "envs/rsem.yaml"
+
+[[rules]]
+name = "salmon"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/summary/salmon/{pair_id}/quant.sf" ]
+resources = { threads = 10 }
+description = "salmon quant (upstream salmon; stage-gated by 'salmon' upstream; needs config.salmon_index)"
+shell = """salmon quant -i {config.salmon_index} -l A -o {config.output_dir}/{config.genome_version}/results/summary/salmon/{pair_id} -1 {input.R1} -2 {input.R2} -p {threads}"""
+[rules.environment]
+conda = "envs/rsem.yaml"

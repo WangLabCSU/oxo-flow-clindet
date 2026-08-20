@@ -1,0 +1,305 @@
+# ============================================================================
+# DRAFT — RNA SNV/indel callers (upstream workflow/RNA/rules/SNV.smk +
+# rules/SNV/{Mutect2,freebayes,HaplotypeCaller,Strelka,Lofreq,vardict,varscan2}.smk).
+# NOT yet live-tested. Reviewed against the live-test cycle before finalizing.
+#
+# All callers run single-sample on the SplitNCigarReads BAM
+# (results/mut/dedup/{pair_id}.split.bam) — RNA has no normal.
+#
+# Upstream gotchas handled here:
+#   - Strelka/Manta rules use plain `gzip -k` on the target BED, but
+#     --callRegions needs bgzip + tabix index — fixed (same as the DNA port).
+#   - unpaired_strelka_filter / lofreq_norm_filter / norm_filter_* declare no
+#     conda env upstream — the port pins envs/clindet.yaml (bcftools).
+#   - norm_filter_freebayes output path carries an extra 'unpaired' segment
+#     (results/vcf_nf/unpaired/...) vs norm_filter_HaplotypeCaller
+#     (results/vcf_nf/...) — kept verbatim; both feed NOTHING in the RNA
+#     path (loop_vcf2maf_rna consumes the raw results/mut/vcf dir).
+#   - strelka.vcf is produced but not in the default rna_caller_list, so it is
+#     never vcf2maf'd (same for sage/pave).
+#   - lofreq singularity URL upstream is
+#     .../lofreq:broken---2.5.1--py38h1bd3507_2 — the tag literally contains
+#     "broken---" (Galaxy depot artifact); VERIFY the image resolves during
+#     the live-test cycle, else pin a clean lofreq image.
+#   - Manta/Strelka runWorkflow.py invocations use the DNA-port hardening
+#     (-m local -j {effective_threads} -g 4) instead of upstream's bare call.
+#
+# P1 — NOT PORTED:
+#   - SNV/sage.smk (unpaired_sage / unpaired_sage_filter_pass /
+#     unpaired_pave_anno_sage / unpaired_pave_filter_pass): sage + pave need
+#     the full hmftools resource set (ensembl_data_dir, GIAB high-confidence
+#     bed, actionability/coding panels, hotspots VCF — multi-GB, not shipped);
+#     AND the rules are ORPHANS upstream — SNV.smk never includes sage.smk.
+#   - SNV/rnaindel.smk (rnaindel): ORPHAN — SNV.smk never includes it, and no
+#     config['singularity']['rnaindel'] entry exists upstream at all (KeyError
+#     if ever included); treat as dead code.
+# ============================================================================
+
+[workflow]
+name = "rna_snv"
+
+# --------------------------------------------------------------- Mutect2 ----
+[[rules]]
+name = "mutect2_call"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
+    ref = "{config.reference}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Mutect2_raw.vcf" ]
+resources = { threads = 10 }
+description = "GATK Mutect2 RNA tumor-only (-pon only when a PON is configured; germline resource always set in fixtures)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && if [ -n "{config.wes_pon}" ]; then PON_ARG="-pon {config.wes_pon}"; else PON_ARG=""; fi && gatk Mutect2 -R {input.ref} --native-pair-hmm-threads {threads} -I {input.Tum} -O {output[0]} $PON_ARG --germline-resource {config.mutect2_germline_vcf} --intervals {config.target_bed}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "M2_filter_unpaired"
+input = {
+    ref = "{config.reference}",
+    vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Mutect2_raw.vcf"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Mutect2.vcf" ]
+resources = { threads = 1 }
+description = "FilterMutectCalls (upstream M2_filter_unpaired; --stats reads the .stats file Mutect2 emits alongside the raw VCF)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk FilterMutectCalls -R {input.ref} -V {input.vcf} --stats {input.vcf}.stats -O {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+# -------------------------------------------------------------- freebayes ----
+[[rules]]
+name = "unpaired_freebayes"
+input = {
+    ref = "{config.reference}",
+    bam = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
+    regions = "{config.target_bed}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/freebayes.vcf" ]
+resources = { threads = 10 }
+description = "freebayes pooled-continuous calling (upstream unpaired_freebayes)"
+shell = """freebayes -f {input.ref} -t {input.regions} --min-coverage 10 -C 3 --pooled-continuous {input.bam} > {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/freebayes%3A1.3.9--hbefcdb2_3"
+
+[[rules]]
+name = "norm_filter_freebayes"
+input = {
+    vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/freebayes.vcf",
+    ref = "{config.reference}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_nf/unpaired/{pair_id}/freebayes.vcf" ]
+description = "bcftools norm+filter freebayes (upstream norm_filter_freebayes; output path has an extra 'unpaired' segment upstream and feeds nothing in the RNA path — vcf2maf consumes the raw dir)"
+shell = """bcftools norm -f {input.ref} -m +both -Ov {input.vcf} | bcftools filter -e 'QUAL<20 | FORMAT/DP[0] < 10' > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------------- HaplotypeCaller ----
+[[rules]]
+name = "call_variants_HaplotypeCaller"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
+    ref = "{config.reference}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/HaplotypeCaller.vcf" ]
+resources = { threads = 10 }
+description = "GATK HaplotypeCaller RNA with upstream -A annotations (upstream call_variants_HaplotypeCaller)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk HaplotypeCaller -R {input.ref} --intervals {config.target_bed} -I {input.Tum} -O {output[0]} -DF MappingQualityAvailableReadFilter --native-pair-hmm-threads {threads} --annotate-with-num-discovered-alleles -A UniqueAltReadCount -A ReferenceBases -A PossibleDeNovo -A Coverage -A DepthPerAlleleBySample -A DepthPerSampleHC -A StrandBiasBySample -A StrandOddsRatio"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "norm_filter_HaplotypeCaller"
+input = {
+    vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/HaplotypeCaller.vcf",
+    ref = "{config.reference}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_nf/{pair_id}/HaplotypeCaller.vcf" ]
+description = "bcftools norm+filter HaplotypeCaller (upstream norm_filter_HaplotypeCaller; no 'unpaired' segment unlike freebayes — upstream inconsistency; feeds nothing in the RNA path)"
+shell = """bcftools norm -f {input.ref} -m +both -Ov {input.vcf} | bcftools filter -e 'QUAL<20 | FORMAT/DP[0] < 10' > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------ Strelka2 + Manta ----
+[[rules]]
+name = "unpaired_call_config_strelka"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
+    ref = "{config.reference}",
+    bed = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/{pair_id}-Manta.log",
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz"
+]
+resources = { threads = 10 }
+description = "Manta indel candidates on the RNA bam (upstream unpaired_call_config_strelka; upstream plain gzip -k fixed to bgzip+tabix; the Manta directory() output collapses to the vcf.gz file)"
+shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
+[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+configManta.py --tumorBam {input.Tum} --runDir {config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Manta --exome --callRegions {input.bed}.gz --referenceFasta {input.ref}
+{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Manta/runWorkflow.py -m local -j {effective_threads} -g 4
+touch {output[0]}"""
+[rules.environment]
+conda = "envs/strelka.yaml"
+
+[[rules]]
+name = "unpaired_call_strelka_manta"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
+    ref = "{config.reference}",
+    indelcd = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz",
+    bed = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Strelka/results/variants/variants.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/{pair_id}-Strelka.log"
+]
+resources = { threads = 8 }
+description = "Strelka2 germline workflow on the RNA bam, Manta-driven (upstream unpaired_call_strelka_manta — RNA has no normal, so the germline workflow runs on the tumor bam alone)"
+shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
+[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+configureStrelkaGermlineWorkflow.py --bam {input.Tum} --referenceFasta {input.ref} --indelCandidates {input.indelcd} --exome --runDir {config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Strelka --callRegions {input.bed}.gz
+{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Strelka/runWorkflow.py -m local -j {effective_threads} -g 4
+touch {output[1]}"""
+[rules.environment]
+conda = "envs/strelka.yaml"
+
+[[rules]]
+name = "unpaired_strelka_filter"
+input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/{pair_id}-Strelka.log" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/strelka.vcf" ]
+description = "keep PASS strelka variants (upstream unpaired_strelka_filter; no conda env upstream — port pins envs/clindet.yaml for bcftools; strelka.vcf is not in the default rna_caller_list, so it is never vcf2maf'd)"
+shell = """bcftools view -f 'PASS' {config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Strelka/results/variants/variants.vcf.gz -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ---------------------------------------------------------------- Lofreq ----
+[[rules]]
+name = "lofreq_call_up"
+input = {
+    ref = "{config.reference}",
+    Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/lofreq_raw.vcf" ]
+resources = { threads = 10 }
+description = "lofreq call-parallel (upstream lofreq_call_up; upstream image tag 'lofreq:broken---2.5.1' — VERIFY it resolves live, else pin a clean lofreq image)"
+shell = """lofreq call-parallel --pp-threads {threads} -f {input.ref} -o {output[0]} {input.Tum}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/lofreq:broken---2.5.1--py38h1bd3507_2"
+
+[[rules]]
+name = "lofreq_norm_filter"
+input = {
+    ref = "{config.reference}",
+    vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/lofreq_raw.vcf"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/lofreq.vcf" ]
+description = "bcftools filter lofreq QUAL/DP (upstream lofreq_norm_filter; no conda env upstream — port pins envs/clindet.yaml)"
+shell = """bcftools filter -e 'QUAL<20 | INFO/DP[0] < 20' {input.vcf} -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ---------------------------------------------------------------- vardict ----
+[[rules]]
+name = "unpaired_vardict_single_mode"
+input = {
+    reference = "{config.reference}",
+    regions = "{config.target_bed}",
+    bam = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/VarDict/{pair_id}.vardict.vcf" ]
+resources = { threads = 10 }
+description = "vardict-java single mode + teststrandbias.R + var2vcf_valid.pl (upstream unpaired_vardict_single_mode)"
+shell = """vardict-java -G {input.reference} -th {threads} -c 1 -S 2 -E 3 -g 4 -N '{pair_id}' -b {input.bam} {input.regions} | teststrandbias.R | var2vcf_valid.pl -A -N '{pair_id}' -E > {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/vardict-java%3A1.8.3--hdfd78af_0"
+
+[[rules]]
+name = "unpaired_filter_vardict"
+input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/VarDict/{pair_id}.vardict.vcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/vardict.vcf" ]
+description = "bcftools PASS/DP/VD filter on vardict (upstream unpaired_filter_vardict)"
+shell = """bcftools view -i 'FILTER="PASS" && INFO/DP>=20 && INFO/VD>=5 && INFO/SVTYPE="." && ALT!~"^<.*>$"' {input[0]} -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# --------------------------------------------------------------- varscan2 ----
+[[rules]]
+name = "varscan2_mpileup_unpaired"
+input = {
+    regions = "{config.target_bed}",
+    tumor = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
+    ref = "{config.reference}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}-T.mp" ]
+resources = { threads = 2 }
+description = "samtools mpileup for varscan2 (upstream varscan2_mpileup_unpaired)"
+shell = """samtools mpileup -q 1 -Q 1 -f {input.ref} -l {input.regions} {input.tumor} > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_call_unpaired_snp"
+input = {
+    ref = "{config.reference}",
+    tumor = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}-T.mp",
+    regions = "{config.target_bed}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.snp.vcf" ]
+description = "varscan mpileup2snp (upstream varscan2_call_unpaired_snp)"
+shell = """varscan mpileup2snp {input.tumor} --min-coverage 10 --min-var-freq 0.20 --p-value 0.05 --output-vcf 1 > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_call_unpaired_indel"
+input = {
+    ref = "{config.reference}",
+    tumor = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}-T.mp",
+    regions = "{config.target_bed}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.vcf" ]
+description = "varscan mpileup2indel (upstream varscan2_call_unpaired_indel)"
+shell = """varscan mpileup2indel {input.tumor} --min-coverage 10 --min-var-freq 0.10 --p-value 0.10 --output-vcf 1 > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_filter_snp"
+input = {
+    snp = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.snp.vcf",
+    indel = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.vcf"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.snp.filter.vcf" ]
+description = "varscan filter on snps (upstream varscan2_filter_snp)"
+shell = """varscan filter {input.snp} --indel-file {input.indel} --output-file {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_filter_indel"
+input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.vcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.filter.vcf" ]
+description = "varscan filter on indels (upstream varscan2_filter_indel)"
+shell = """varscan filter {input.indel} --min-reads2 4 --min-var-freq 0.15 --p-value 0.05 --output-file {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_merge_unpaired"
+input = {
+    snp = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.snp.filter.vcf",
+    indel = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.filter.vcf"
+}
+output = {
+    vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan2.vcf",
+    name_change = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/sample_name.txt"
+}
+resources = { threads = 1 }
+description = "bgzip+tabix+concat varscan2 snp/indel + reheader Sample1->{sample} (upstream varscan2_merge_unpaired)"
+shell = """echo -e "Sample1\\t{pair_id}" > {output.name_change}
+bgzip {input.snp} -k -o {input.snp}.gz
+tabix {input.snp}.gz
+bgzip {input.indel} -k -o {input.indel}.gz
+tabix {input.indel}.gz
+bcftools concat -a {input.snp}.gz {input.indel}.gz | bcftools view | bcftools reheader -s {output.name_change} -o {output.vcf}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
