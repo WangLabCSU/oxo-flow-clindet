@@ -4,7 +4,10 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - strelka
+  # pinned to 2.9.7: the 2.9.10 hdfd78af_2 build's strelka2 binary segfaults
+  # in the dynamic loader on glibc 2.39 hosts (live-verified, even from the
+  # pristine conda package; starling2 from the same package is unaffected)
+  - strelka=2.9.7
   - manta
   - tabix
   - libboost=1.85.0

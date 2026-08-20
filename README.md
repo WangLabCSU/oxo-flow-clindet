@@ -45,7 +45,9 @@ git clone https://github.com/WangLabCSU/oxo-flow-clindet.git
 - **Compute**: up to 30 threads / 10 GB per rule (mapping rules request
   30 threads; the cancer report 10 GB).
 - **Tools**: conda envs in `envs/` (pinned: varscan 2.4.6, vcf2maf 1.6.22,
-  ensembl-vep 114.2, libboost 1.85.0) plus pinned Singularity/Docker images
+  ensembl-vep 114.2, libboost 1.85.0, strelka 2.9.7 — the 2.9.10 conda
+  build's strelka2 binary segfaults in the loader on glibc 2.39, see
+  `envs/strelka.yaml`) plus pinned Singularity/Docker images
   for GATK 4.6.2.0, VarDict 1.8.3, MuSE 2.1.2 and CaVEMan 1.15.3 (see the
   `[rules.environment]` entries).
 
