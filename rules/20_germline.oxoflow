@@ -135,7 +135,8 @@ output = [
 ]
 resources = { threads = 20 }
 description = "caveman.pl somatic SNV calling (upstream CM_call else-branch)"
-shell = """caveman.pl -outdir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman -reference {config.reference}.fai -tc {input.Tcnv} -nc {input.NCcnv} -td 2 -nd 2 -tumour-bam {input.Tum} -normal-bam {input.NC} -ignore-file "" -s {config.genome_version} -sa {config.genome_version} -seqType WGS -t {threads} -no-flagging
+shell = """touch {config.output_dir}/{config.genome_version}/results/cnv/paired/{pair_id}/{pair_id}_ig.bed
+caveman.pl -outdir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/caveman -reference {config.reference}.fai -tc {input.Tcnv} -nc {input.NCcnv} -td 2 -nd 2 -tumour-bam {input.Tum} -normal-bam {input.NC} -ignore-file {config.output_dir}/{config.genome_version}/results/cnv/paired/{pair_id}/{pair_id}_ig.bed -s {config.genome_version} -sa {config.genome_version} -seqType WGS -t {threads} -no-flagging
 touch {output[2]}"""
 [rules.environment]
 singularity = "docker://quay.io/wtsicgp/cgpcavemanwrapper:1.15.3"
