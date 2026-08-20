@@ -17,7 +17,7 @@ input = {
     rmd_file = "report/main.Rmd"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html" ]
-when = "config.run_report"
+when = "config.run_report && config.vep_cache_ready"
 resources = { memory = "10000M" }
 description = "render the clindet case report (upstream run_cancer_report + rmd.R)"
 shell = """Rscript scripts/smk.R --script scripts/rmd.R --param report_rmd {input.rmd_file} --param output_file {output[0]} --param af_keygenes {input.af_keygenes} --param genome_version {config.genome_version} --param tumor_name {pair_id} --param somatic_mut_maf {input.somatic_mut_maf}"""

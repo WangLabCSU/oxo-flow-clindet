@@ -41,11 +41,16 @@ git clone https://github.com/WangLabCSU/oxo-flow-clindet.git
   gnomAD VCFs, and a BWA index of the reference FASTA; annotation VCFs need
   tabix indexes (runtime, when running the pipeline for real).
 - **VEP cache**: GRCh38, cache version 110, at the configured `vep_data`
-  path (upstream default: `resources/ref_genome/hg38/vep`).
+  path (upstream default: `resources/ref_genome/hg38/vep`). The vcf2maf
+  rules and the downstream MAF merge/flag/cancer-report tail are gated on
+  `vep_cache_ready = false` — set it `true` once the cache is in place
+  (upstream fails hard without it).
 - **Compute**: up to 30 threads / 10 GB per rule (mapping rules request
   30 threads; the cancer report 10 GB).
 - **Tools**: conda envs in `envs/` (pinned: varscan 2.4.6, vcf2maf 1.6.22,
-  ensembl-vep 114.2, libboost 1.85.0) plus pinned Singularity/Docker images
+  ensembl-vep 114.2, libboost 1.85.0, strelka 2.9.7 — the 2.9.10 conda
+  build's strelka2 binary segfaults in the loader on glibc 2.39, see
+  `envs/strelka.yaml`) plus pinned Singularity/Docker images
   for GATK 4.6.2.0, VarDict 1.8.3, MuSE 2.1.2 and CaVEMan 1.15.3 (see the
   `[rules.environment]` entries).
 
@@ -86,11 +91,11 @@ pair: columns `pair_id,experiment,control,experiment_type`.
 | merge_strelka_manta | `merge_strelka_manta` | bcftools | upstream `{params.indel}` bug fixed (single concat+sort) |
 | strelka somatic (via manta) | `call_strelka_somatic_manta` + `merge_strelka_somatic_manta` | strelka2, manta, bcftools | same pipeline on somatic config |
 | CM_cnv | `CM_cnv` | touch | empty tumour/normal CNV beds (upstream default) |
-| CM_call / CM_flag | `CM_call` / `CM_flag` | caveman 1.15.3 (container) | `-td 2 -nd 2 -seqType WGS -no-flagging`, flag with `-umv .` |
+| CM_call / CM_flag | `CM_call` / `CM_flag` | caveman 1.15.3 (container) | `-td 2 -nd 2 -seqType WGS -no-flagging`, flag with `-umv .`; `-ignore-file` fed a one-region bed on a contig absent from the reference (upstream passes `""`, which caveman 1.15.3 rejects — same "no ignore regions" semantics); flagger gets real `-c`/`-v` configs from `test/fixtures/flag` (GRCh38 params verbatim, bed-based flags dropped — no chr21 flag data) plus empty `-b`/`-ab` dirs and `-t genomic` (upstream's `""`/`""`/`"genome"` are rejected by cgpFlagCaVEMan 1.15.3) |
 | CM_germ_flag | `CM_germ_flag` | bcftools | `-e 'DP<=30' -s LowDP --mode x` |
 | vcf_norm (per caller) | `vcf_norm_{Mutect2,vardict,varscan2,muse,HaplotypeCaller,germline_strelkamanta,germline_caveman}` | bcftools >=1.22 | verbatim per-caller FILTER rules incl. vardict contig-header branch |
-| loop_vcf2maf_paired | `vcf2maf_{Mutect2,vardict,varscan2,muse,HaplotypeCaller}` | vcf2maf 1.6.22, ensembl-vep 114.2 | verbatim tumor/normal IDs per `get_vcf_name` |
-| loop_vcf2maf_germ_paired | `vcf2maf_germ_strelkamanta` / `vcf2maf_germ_caveman` | vcf2maf 1.6.22 | TUMOUR/NORMAL for CaVEMan |
+| loop_vcf2maf_paired | `vcf2maf_{Mutect2,vardict,varscan2,muse,HaplotypeCaller}` | vcf2maf 1.6.22, ensembl-vep 114.2 | verbatim tumor/normal IDs per `get_vcf_name`; gated on `vep_cache_ready` |
+| loop_vcf2maf_germ_paired | `vcf2maf_germ_strelkamanta` / `vcf2maf_germ_caveman` | vcf2maf 1.6.22 | TUMOUR/NORMAL for CaVEMan; gated on `vep_cache_ready` |
 | merge_loop (somatic) | `merge_paired_maf` | merge_maf.R (verbatim) | driven via scripts/smk.R shim |
 | merge_loop_germline | `merge_paired_germ_maf` | merge_maf.R (verbatim) | |
 | make_region_bed_list + flag_mutation_pairead_maf | `make_region_bed_list` + `flag_mutation_pairead_maf` | flag_mutation_maf.R (verbatim) | empty bed_list = header-only TSV |

@@ -4,7 +4,6 @@ name: clindet
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - ascat>=3.2.0
   - bcftools>=1.22
@@ -30,4 +29,5 @@ dependencies:
   - sra-tools
   - pysam
   - pip
+  - ca-certificates
   - bioconductor-tximport

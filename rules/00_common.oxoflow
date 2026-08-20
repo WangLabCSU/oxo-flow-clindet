@@ -72,7 +72,8 @@ input = {
 output = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-T.sorted.bam" ]
 resources = { threads = 30 }
 description = "bwa mem -MR + fixmate + sort for tumor (upstream map_reads)"
-shell = """bwa mem -t {threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {threads} -O bam -o {output[0]}"""
+shell = """[ -f {config.reference}.bwt ] || bwa index {config.reference} # the fixture kit ships the fasta only; build the index on first use # (live: fail to locate the index files)
+bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 
@@ -85,7 +86,8 @@ input = {
 output = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-NC.sorted.bam" ]
 resources = { threads = 30 }
 description = "bwa mem -MR + fixmate + sort for normal (upstream map_reads)"
-shell = """bwa mem -t {threads} -MR '@RG\\tID:{pair_id}_NC\\tPL:Illumia\\tSM:{pair_id}_NC\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {threads} -O bam -o {output[0]}"""
+shell = """[ -f {config.reference}.bwt ] || bwa index {config.reference} # the fixture kit ships the fasta only; build the index on first use # (live: fail to locate the index files)
+bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_NC\\tPL:Illumia\\tSM:{pair_id}_NC\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 

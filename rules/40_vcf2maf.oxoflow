@@ -16,6 +16,7 @@ input = [
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/Mutect2.vcf.maf" ]
 description = "vcf2maf on Mutect2 (tumor-id {sample}_T / normal-id {sample}_NC)"
+when = "config.vep_cache_ready"
 shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NC --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
 [rules.environment]
 conda = "envs/clindet_vep.yaml"
@@ -28,6 +29,7 @@ input = [
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/vardict.vcf.maf" ]
 description = "vcf2maf on vardict (tumor-id {sample}_T / normal-id {sample}_NC)"
+when = "config.vep_cache_ready"
 shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NC --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
 [rules.environment]
 conda = "envs/clindet_vep.yaml"
@@ -40,6 +42,7 @@ input = [
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/varscan2.vcf.maf" ]
 description = "vcf2maf on varscan2 (upstream ids TUMOR/NORMAL)"
+when = "config.vep_cache_ready"
 shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id TUMOR --normal-id NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
 [rules.environment]
 conda = "envs/clindet_vep.yaml"
@@ -52,6 +55,7 @@ input = [
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/muse.vcf.maf" ]
 description = "vcf2maf on MuSE (upstream ids TUMOR/NORMAL)"
+when = "config.vep_cache_ready"
 shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id TUMOR --normal-id NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
 [rules.environment]
 conda = "envs/clindet_vep.yaml"
@@ -64,6 +68,7 @@ input = [
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/HaplotypeCaller.vcf.maf" ]
 description = "vcf2maf on HaplotypeCaller (tumor-id {sample}_T / normal-id {sample}_NC)"
+when = "config.vep_cache_ready"
 shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NC --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
 [rules.environment]
 conda = "envs/clindet_vep.yaml"
@@ -77,6 +82,7 @@ input = [
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/strelkamanta.vcf.maf" ]
 description = "germline vcf2maf on strelkamanta (tumor-id {sample}_T / normal-id {sample}_NC)"
+when = "config.vep_cache_ready"
 shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NC --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
 [rules.environment]
 conda = "envs/clindet_vep.yaml"
@@ -89,6 +95,7 @@ input = [
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/caveman.vcf.maf" ]
 description = "germline vcf2maf on caveman (upstream ids TUMOUR/NORMAL)"
+when = "config.vep_cache_ready"
 shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id TUMOUR --normal-id NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
 [rules.environment]
 conda = "envs/clindet_vep.yaml"

@@ -152,6 +152,10 @@ resources = { threads = 10 }
 description = "MuSE call (upstream muse_call)"
 shell = """if [ -x /MuSE/bin/MuSE ]; then
     MUSE_BIN=/MuSE/bin/MuSE
+elif [ -x /usr/local/bin/MuSE ]; then
+    # biocontainers images ship MuSE at /usr/local/bin (live: neither
+    # /MuSE/bin/MuSE nor PATH matched inside the galaxy-depot image)
+    MUSE_BIN=/usr/local/bin/MuSE
 elif command -v MuSE >/dev/null 2>&1; then
     MUSE_BIN=MuSE
 else
@@ -170,6 +174,10 @@ resources = { threads = 10 }
 description = "MuSE sump with dbSNP (upstream muse_sump)"
 shell = """if [ -x /MuSE/bin/MuSE ]; then
     MUSE_BIN=/MuSE/bin/MuSE
+elif [ -x /usr/local/bin/MuSE ]; then
+    # biocontainers images ship MuSE at /usr/local/bin (live: neither
+    # /MuSE/bin/MuSE nor PATH matched inside the galaxy-depot image)
+    MUSE_BIN=/usr/local/bin/MuSE
 elif command -v MuSE >/dev/null 2>&1; then
     MUSE_BIN=MuSE
 else
