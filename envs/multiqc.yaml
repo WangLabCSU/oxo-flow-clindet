@@ -3,6 +3,5 @@ name: clindet_multiqc
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - bioconda::multiqc
