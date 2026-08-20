@@ -22,7 +22,7 @@ description = "configManta.py tumor/normal SV + indel candidates (upstream call_
 shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
 [ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
 configManta.py --tumorBam {input.Tum} --bam {input.NC} --runDir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta --exome --callRegions {input.bed}.gz --referenceFasta {input.ref}
-{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/runWorkflow.py
+{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/runWorkflow.py -m local -j {effective_threads} -g 3
 touch {output[1]}"""
 [rules.environment]
 conda = "envs/strelka.yaml"
