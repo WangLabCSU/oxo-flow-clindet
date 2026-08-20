@@ -18,11 +18,11 @@ output = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz",
     "{config.output_dir}/{config.genome_version}/results/logs/strelka/paired/{pair_id}/{pair_id}-Manta.log"
 ]
-description = "configManta.py tumor/normal SV + indel candidates (upstream call_config_strelka)"
+description = "configManta.py tumor/normal SV + indel candidates (upstream call_config_strelka) # -g 4: upstream relies on runWorkflow's node-memory auto-estimate, which under-reports on small boxes and dies at mergeLocusGraph (mergeMemMb=4096 > budget)"
 shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
 [ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
 configManta.py --tumorBam {input.Tum} --bam {input.NC} --runDir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta --exome --callRegions {input.bed}.gz --referenceFasta {input.ref}
-{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/runWorkflow.py -m local -j {effective_threads} -g 3
+{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/runWorkflow.py -m local -j {effective_threads} -g 4
 touch {output[1]}"""
 [rules.environment]
 conda = "envs/strelka.yaml"
@@ -45,7 +45,7 @@ description = "configureStrelkaGermlineWorkflow on normal (upstream call_strelka
 shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
 [ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
 configureStrelkaGermlineWorkflow.py --bam {input.NC} --referenceFasta {input.ref} --indelCandidates {input.indelcd} --exome --runDir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta --callRegions {input.bed}.gz
-{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta/runWorkflow.py -m local -j {effective_threads} -g 3
+{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta/runWorkflow.py -m local -j {effective_threads} -g 4
 touch {output[1]}"""
 [rules.environment]
 conda = "envs/strelka.yaml"
@@ -84,7 +84,7 @@ description = "configureStrelkaSomaticWorkflow with Manta candidates (upstream c
 shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
 [ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
 configureStrelkaSomaticWorkflow.py --tumorBam {input.Tum} --normalBam {input.NC} --indelCandidates {input.indelcd} --referenceFasta {input.ref} --runDir {config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta --callRegions {input.bed}.gz
-{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/runWorkflow.py -m local -j {effective_threads} -g 3
+{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/runWorkflow.py -m local -j {effective_threads} -g 4
 touch {output[2]}"""
 [rules.environment]
 conda = "envs/strelka.yaml"
