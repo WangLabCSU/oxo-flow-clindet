@@ -41,7 +41,11 @@ description = "STAR 1-pass alignment + splice-junction filter (upstream STAR_1_p
 shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
     echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
     mkdir -p {config.star_index}
-    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference}
+    # --genomeSAindexNbases must scale with genome size (STAR: min(14,
+    # log2(len)/2 - 1)); the default 14 on the 900bp fixture reference
+    # produced a phantom 1.5GB SA write (live: ENOSPC on the box root fs)
+    GSIN=$(python3 -c 'import math, pathlib; n = sum(len(l.strip()) for l in pathlib.Path("{config.reference}").read_text().splitlines() if not l.startswith(">")); print(min(14, int(math.log2(n)) // 2 - 1))')
+    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference} --genomeSAindexNbases "$GSIN"
 else
     echo "[STAR index] Existing STAR index found. Skip building."
 fi
@@ -93,7 +97,11 @@ description = "STAR re-alignment for mutation calling + addreplacerg + sort (ups
 shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
     echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
     mkdir -p {config.star_index}
-    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference}
+    # --genomeSAindexNbases must scale with genome size (STAR: min(14,
+    # log2(len)/2 - 1)); the default 14 on the 900bp fixture reference
+    # produced a phantom 1.5GB SA write (live: ENOSPC on the box root fs)
+    GSIN=$(python3 -c 'import math, pathlib; n = sum(len(l.strip()) for l in pathlib.Path("{config.reference}").read_text().splitlines() if not l.startswith(">")); print(min(14, int(math.log2(n)) // 2 - 1))')
+    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference} --genomeSAindexNbases "$GSIN"
 else
     echo "[STAR index] Existing STAR index found. Skip building."
 fi
