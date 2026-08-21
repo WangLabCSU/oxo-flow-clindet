@@ -4,6 +4,10 @@
 #
 # Port wildcards: upstream {sample} -> {pair_id}.
 #
+# Deviations: samtools sort -m is scaled to the box memory
+# ({effective_memory_mb}/4/threads) instead of upstream's hardcoded 1G —
+# samtools sort allocates the buffer per thread upfront and 3 concurrent
+# STAR rules x 10 x 1G OOM'd the 3.7GB live box; output is identical.
 # Upstream gotchas handled here:
 #   - STAR rules build the STAR index inside the rule shell if
 #     {index}/SA|Genome|SAindex is missing (genomeGenerate side effect — kept,
@@ -36,7 +40,7 @@ output = [
     "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_pass1.log",
     "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/_STARpass1/SJ.filt"
 ]
-resources = { threads = 10 }
+resources = { threads = 10, memory = "3000M" }
 description = "STAR 1-pass alignment + splice-junction filter (upstream STAR_1_pass; builds the STAR index inline if missing)"
 shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
     echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
@@ -69,10 +73,10 @@ output = {
     um_fq1 = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_unmapped_R1.fq",
     um_fq2 = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_unmapped_R2.fq"
 }
-resources = { threads = 10 }
+resources = { threads = 10, memory = "3000M" }
 description = "STAR 2nd pass with chimera options for arriba + samtools sort/index (upstream STAR_arriba_map)"
 shell = """STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype BAM Unsorted --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/ --outReadsUnmapped Fastx --sjdbFileChrStartEnd {input.sj_filt} --sjdbGTFfile {config.rna_gtf} --outFilterMultimapNmax 50 --peOverlapNbasesMin 10 --alignSplicedMateMapLminOverLmate 0.5 --alignSJstitchMismatchNmax 5 -1 5 5 --chimSegmentMin 10 --chimOutType WithinBAM HardClip --chimJunctionOverhangMin 10 --chimScoreDropMax 30 --chimScoreJunctionNonGTAG 0 --chimScoreSeparation 1 --chimSegmentReadGapMax 3 --chimMultimapNmax 50 --readFilesIn {input.R1} {input.R2} --readFilesCommand gunzip -c
-samtools sort -@ {threads} -m 1G -o {output.bam} {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/Aligned.out.bam
+samtools sort -@ {threads} -m $(({effective_memory_mb} / 4 / {threads}))M -o {output.bam} {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/Aligned.out.bam
 samtools index {output.bam}
 mv {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/Unmapped.out.mate1 {output.um_fq1}
 mv {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/Unmapped.out.mate2 {output.um_fq2}
@@ -92,7 +96,7 @@ output = {
     unsort_bam = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/Aligned.out.bam",
     bai = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/{pair_id}.sorted.bam.bai"
 }
-resources = { threads = 10 }
+resources = { threads = 10, memory = "3000M" }
 description = "STAR re-alignment for mutation calling + addreplacerg + sort (upstream STAR_mut_map; upstream two_pass param is dead — no --twopassMode in the shell)"
 shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
     echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
@@ -107,7 +111,7 @@ else
 fi
 STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype BAM Unsorted --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/ --outReadsUnmapped Fastx --sjdbGTFfile {config.rna_gtf} --alignIntronMax 1000000 --alignIntronMin 20 --alignMatesGapMax 1000000 --alignSJDBoverhangMin 1 --alignSJoverhangMin 8 --alignSoftClipAtReferenceEnds Yes --chimJunctionOverhangMin 15 --chimMainSegmentMultNmax 1 --chimOutJunctionFormat 1 --chimSegmentMin 15 --limitSjdbInsertNsj 1200000 --outFilterIntronMotifs None --outFilterMatchNminOverLread 0.33 --outFilterMismatchNmax 999 --outFilterMismatchNoverLmax 0.1 --outFilterMultimapNmax 20 --outFilterScoreMinOverLread 0.33 --outSAMmapqUnique 60 --readFilesIn {input.R1} {input.R2} --readFilesCommand gunzip -c
 samtools addreplacerg -@ {threads} -r 'ID:{pair_id}' -r 'PL:ILLUMINA.NovaSeq' -r 'LB:RNA-Seq' -r 'SM:{pair_id}' -o {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/Aligned.out.bam
-samtools sort -@ {threads} -m 1G -o {output.bam} {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam
+samtools sort -@ {threads} -m $(({effective_memory_mb} / 4 / {threads}))M -o {output.bam} {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam
 samtools index {output.bam}
 rm {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam"""
 [rules.environment]
@@ -139,7 +143,7 @@ input = [ "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pai
 output = [ "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.sorted.bam" ]
 resources = { threads = 10 }
 description = "samtools sort+index of RSEM genome BAM (upstream RSEM_sort_genome; temp() upstream, kept persistent here so arriba_draw can consume it)"
-shell = """samtools sort -@ {threads} -m 1G -o {output[0]} {input[0]}
+shell = """samtools sort -@ {threads} -m $(({effective_memory_mb} / 4 / {threads}))M -o {output[0]} {input[0]}
 samtools index {output[0]}"""
 [rules.environment]
 conda = "envs/rsem.yaml"
