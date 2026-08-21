@@ -70,7 +70,8 @@ def main() -> None:
         # The fai offset must point at the first sequence BASE, i.e. past
         # the header — pointing at the header itself makes every consumer
         # read ">chrX" as sequence (live: GATK 'Negative position').
-        fai_lines.append(f"{n}\t{len(s)}\t{block_start + len(f'>{n}\\n')}\t60\t61")
+        header_len = len(n) + 2  # ">" + name + "\n"
+        fai_lines.append(f"{n}\t{len(s)}\t{block_start + header_len}\t60\t61")
         dict_lines.append(
             f"@SQ\tSN:{n}\tLN:{len(s)}\tM5:{hashlib.md5(s.encode()).hexdigest()}")
         body.append(block)
