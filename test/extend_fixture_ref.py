@@ -62,15 +62,19 @@ def main() -> None:
     # position", live).
     import hashlib
 
-    body, offset, fai_lines, dict_lines = [], 0, [], ["@HD\tVN:1.6\tSO:unsorted"]
+    body, block_start, fai_lines = [], 0, []
+    dict_lines = ["@HD\tVN:1.6\tSO:unsorted"]
     for n, s in (("chr21", chr21), ("chrX", chrX)):
         block = f">{n}\n" + "\n".join(s[i : i + 60]
                                       for i in range(0, len(s), 60)) + "\n"
-        fai_lines.append(f"{n}\t{len(s)}\t{offset}\t60\t61")
+        # The fai offset must point at the first sequence BASE, i.e. past
+        # the header — pointing at the header itself makes every consumer
+        # read ">chrX" as sequence (live: GATK 'Negative position').
+        fai_lines.append(f"{n}\t{len(s)}\t{block_start + len(f'>{n}\\n')}\t60\t61")
         dict_lines.append(
             f"@SQ\tSN:{n}\tLN:{len(s)}\tM5:{hashlib.md5(s.encode()).hexdigest()}")
         body.append(block)
-        offset += len(block)
+        block_start += len(block)
     FASTA.write_text("".join(body))
     (SEQ_DIR / "Homo_sapiens_assembly38_chr21.fasta.fai").write_text(
         "\n".join(fai_lines) + "\n")
