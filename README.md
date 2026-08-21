@@ -82,7 +82,8 @@ when targeted:
 ```bash
 # preview / run the default stages (arriba + call_mut)
 oxo-flow dry-run main_rna.oxoflow \
-  -t fastp_trim -t STAR_ -t arriba_fusion -t link_bam -t SplitNCigarReads \
+  -t fastp_trim -t STAR_1_pass -t STAR_arriba_map -t STAR_mut_map \
+  -t arriba_fusion -t link_bam -t SplitNCigarReads \
   -t mutect2 -t M2_filter -t unpaired -t call_variants -t lofreq \
   -t varscan2 -t norm_filter
 oxo-flow run main_rna.oxoflow -j 8 <same -t flags>

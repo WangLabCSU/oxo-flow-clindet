@@ -10,7 +10,8 @@ OXO=${OXO:-oxo-flow}
 # the RSEM/kallisto/salmon/TRUST4 quant rules and isofox are NOT in the
 # default stages upstream.
 TARGETS=(
-  -t fastp_trim -t STAR_ -t arriba_fusion -t link_bam -t SplitNCigarReads
+  -t fastp_trim -t STAR_1_pass -t STAR_arriba_map -t STAR_mut_map
+  -t arriba_fusion -t link_bam -t SplitNCigarReads
   -t mutect2 -t M2_filter -t unpaired -t call_variants -t lofreq
   -t varscan2 -t norm_filter
 )
