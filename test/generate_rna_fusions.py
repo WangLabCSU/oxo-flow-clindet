@@ -56,7 +56,7 @@ def find_junctions(ref: str) -> list[tuple[int, int]]:
     for i in range(len(ref) - SEG1):
         if ref[i + SEG1 - 1 : i + SEG1 + 1] != "GT":
             continue
-        for j in range(2, len(ref) - SEG2):
+        for j in range(2, len(ref) - 150):
             if ref[j - 2 : j] != "AG":
                 continue
             if abs(j - (i + SEG1)) < MIN_DIST:
@@ -86,7 +86,12 @@ def main() -> None:
         for jx, (i, j) in enumerate(picks):
             seg1 = ref[i : i + SEG1]
             seg2 = ref[j : j + SEG2]
-            mate = revcomp(ref[i : i + 150])
+            # The mate maps at the ACCEPTOR locus: a mate sitting next to
+            # the donor makes STAR resolve the pair as a proper pair and
+            # never attempt chimera detection (observed live: 100M50S with
+            # zero chimeric reads).  A discordant mate is also the real
+            # fusion biology (mates flank the junction from both sides).
+            mate = revcomp(ref[j : j + 150])
             for k in range(READS_PER_JUNCTION):
                 n += 1
                 name = f"fusion_{jx}_{k}"
