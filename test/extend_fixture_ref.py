@@ -54,8 +54,11 @@ def main() -> None:
         # the fusion mates align back to chr21 (live: R2 mapped 150M to
         # chr21, the chimeric side hard-clipped, arriba saw no split
         # reads). Seeded random keeps it reproducible and unalignable
-        # from the chr21 reads.
-        rng = random.Random(42)
+        # from the chr21 reads. SEED 43, NOT 42: the fixture's chr21 is
+        # itself the output of random.Random(42) from an earlier fixture
+        # session — seed 42 reproduced chr21 byte-for-byte (live: two
+        # identical contigs, STAR spliced the fusion reads on chr21).
+        rng = random.Random(43)
         chrX = "".join(rng.choice("ACGT") for _ in range(len(chr21)))
     elif names == ["chr21", "chrX"]:
         chr21, chrX = seqs[0][1], seqs[1][1]
