@@ -9,9 +9,13 @@
 # samtools sort allocates the buffer per thread upfront and 3 concurrent
 # STAR rules x 10 x 1G OOM'd the 3.7GB live box; output is identical.
 # Upstream gotchas handled here:
-#   - STAR rules build the STAR index inside the rule shell if
-#     {index}/SA|Genome|SAindex is missing (genomeGenerate side effect — kept,
-#     same pattern as the DNA port's inline `bwa index`).
+#   - STAR_1_pass builds the STAR index inside its shell (unconditional
+#     rebuild — it only re-runs when its declared inputs change, and the
+#     reference/GTF are declared inputs so a reference swap invalidates
+#     the index; live: the old `[ -s ... ]` guard kept a single-contig
+#     index across a two-contig reference and unmapped every chrX read).
+#     STAR_mut_map takes a pass1-log input edge so it can never race a
+#     concurrent rebuild.
 #   - STAR_arriba_map: upstream trailing-`\` glues `{sj_filt}--sjdbGTFfile`
 #     into a single token (line-continuation bug) — flags split here.
 #   - STAR_mut_map: params.two_pass = '--twopassMode Basic' is never passed to
@@ -34,7 +38,14 @@ name = "rna_mapping"
 name = "STAR_1_pass"
 input = {
     R1 = "{config.rna_fastq_r1}",
-    R2 = "{config.rna_fastq_r2}"
+    R2 = "{config.rna_fastq_r2}",
+    # The reference and GTF feed the inline index build in the shell —
+    # they MUST be declared inputs so a reference change invalidates the
+    # rule (live: a stale single-contig index survived a two-contig
+    # reference swap because the `[ -s ... ]` guard skipped the rebuild
+    # and nothing tracked the fasta).
+    ref = "{config.reference}",
+    gtf = "{config.rna_gtf}"
 }
 output = [
     "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_pass1.log",
@@ -42,17 +53,18 @@ output = [
 ]
 resources = { threads = 10, memory = "3000M" }
 description = "STAR 1-pass alignment + splice-junction filter (upstream STAR_1_pass; builds the STAR index inline if missing)"
-shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
-    echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
-    mkdir -p {config.star_index}
-    # --genomeSAindexNbases must scale with genome size (STAR: min(14,
-    # log2(len)/2 - 1)); the default 14 on the 900bp fixture reference
-    # produced a phantom 1.5GB SA write (live: ENOSPC on the box root fs)
-    GSIN=$(python3 -c 'import math, pathlib; n = sum(len(l.strip()) for l in pathlib.Path("{config.reference}").read_text().splitlines() if not l.startswith(">")); print(min(14, int(math.log2(n)) // 2 - 1))')
-    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference} --genomeSAindexNbases "$GSIN"
-else
-    echo "[STAR index] Existing STAR index found. Skip building."
-fi
+shell = """# Rebuild unconditionally: the rule only re-runs when its declared
+# inputs change (reads/ref/gtf), and a stale index from a previous
+# reference silently poisons every downstream STAR rule (live: the
+# single-contig index survived the two-contig reference swap and
+# unmapped every chrX read).
+rm -rf {config.star_index}
+mkdir -p {config.star_index}
+# --genomeSAindexNbases must scale with genome size (STAR: min(14,
+# log2(len)/2 - 1)); the default 14 on the 900bp fixture reference
+# produced a phantom 1.5GB SA write (live: ENOSPC on the box root fs)
+GSIN=$(python3 -c 'import math, pathlib; n = sum(len(l.strip()) for l in pathlib.Path("{config.reference}").read_text().splitlines() if not l.startswith(">")); print(min(14, int(math.log2(n)) // 2 - 1))')
+STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference} --genomeSAindexNbases "$GSIN"
 STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype None --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/_STARpass1/ --readFilesIn {input.R1} {input.R2} --readFilesCommand zcat
 awk '$1~/(chr)?[1-2XY]/ && $6==0 && $5>0 && $7>0' {config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/_STARpass1/SJ.out.tab > {output[1]}
 touch {output[0]}"""
@@ -89,7 +101,11 @@ conda = "envs/rsem.yaml"
 name = "STAR_mut_map"
 input = {
     R1 = "{config.rna_fastq_r1}",
-    R2 = "{config.rna_fastq_r2}"
+    R2 = "{config.rna_fastq_r2}",
+    # The index is built by STAR_1_pass; this input edge serializes the
+    # two rules (a concurrent double-rebuild of the same index dir
+    # would race) and makes STAR_1_pass's invalidation propagate here.
+    pass1 = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_pass1.log"
 }
 output = {
     bam = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/{pair_id}.sorted.bam",
@@ -98,18 +114,7 @@ output = {
 }
 resources = { threads = 10, memory = "3000M" }
 description = "STAR re-alignment for mutation calling + addreplacerg + sort (upstream STAR_mut_map; upstream two_pass param is dead — no --twopassMode in the shell)"
-shell = """if [ ! -s {config.star_index}/SA ] || [ ! -s {config.star_index}/Genome ] || [ ! -s {config.star_index}/SAindex ]; then
-    echo "[STAR index] STAR index not found or incomplete. Building STAR index..."
-    mkdir -p {config.star_index}
-    # --genomeSAindexNbases must scale with genome size (STAR: min(14,
-    # log2(len)/2 - 1)); the default 14 on the 900bp fixture reference
-    # produced a phantom 1.5GB SA write (live: ENOSPC on the box root fs)
-    GSIN=$(python3 -c 'import math, pathlib; n = sum(len(l.strip()) for l in pathlib.Path("{config.reference}").read_text().splitlines() if not l.startswith(">")); print(min(14, int(math.log2(n)) // 2 - 1))')
-    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {config.star_index} --genomeFastaFiles {config.reference} --genomeSAindexNbases "$GSIN"
-else
-    echo "[STAR index] Existing STAR index found. Skip building."
-fi
-STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype BAM Unsorted --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/ --outReadsUnmapped Fastx --sjdbGTFfile {config.rna_gtf} --alignIntronMax 1000000 --alignIntronMin 20 --alignMatesGapMax 1000000 --alignSJDBoverhangMin 1 --alignSJoverhangMin 8 --alignSoftClipAtReferenceEnds Yes --chimJunctionOverhangMin 15 --chimMainSegmentMultNmax 1 --chimOutJunctionFormat 1 --chimSegmentMin 15 --limitSjdbInsertNsj 1200000 --outFilterIntronMotifs None --outFilterMatchNminOverLread 0.33 --outFilterMismatchNmax 999 --outFilterMismatchNoverLmax 0.1 --outFilterMultimapNmax 20 --outFilterScoreMinOverLread 0.33 --outSAMmapqUnique 60 --readFilesIn {input.R1} {input.R2} --readFilesCommand gunzip -c
+shell = """STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype BAM Unsorted --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/ --outReadsUnmapped Fastx --sjdbGTFfile {config.rna_gtf} --alignIntronMax 1000000 --alignIntronMin 20 --alignMatesGapMax 1000000 --alignSJDBoverhangMin 1 --alignSJoverhangMin 8 --alignSoftClipAtReferenceEnds Yes --chimJunctionOverhangMin 15 --chimMainSegmentMultNmax 1 --chimOutJunctionFormat 1 --chimSegmentMin 15 --limitSjdbInsertNsj 1200000 --outFilterIntronMotifs None --outFilterMatchNminOverLread 0.33 --outFilterMismatchNmax 999 --outFilterMismatchNoverLmax 0.1 --outFilterMultimapNmax 20 --outFilterScoreMinOverLread 0.33 --outSAMmapqUnique 60 --readFilesIn {input.R1} {input.R2} --readFilesCommand gunzip -c
 samtools addreplacerg -@ {threads} -r 'ID:{pair_id}' -r 'PL:ILLUMINA.NovaSeq' -r 'LB:RNA-Seq' -r 'SM:{pair_id}' -o {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/Aligned.out.bam
 samtools sort -@ {threads} -m $(({effective_memory_mb} / 4 / {threads}))M -o {output.bam} {config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/addRG.bam
 samtools index {output.bam}
