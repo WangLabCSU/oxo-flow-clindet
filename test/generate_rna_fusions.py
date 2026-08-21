@@ -31,7 +31,9 @@ READS = ROOT / "test/fixtures/reads"
 
 SEG1, SEG2 = 100, 50          # donor / acceptor segment lengths
 FUSION_COUNT = 5              # distinct junctions
-READS_PER_JUNCTION = 5        # fusion pairs per junction
+READS_PER_JUNCTION = 20       # fusion pairs per junction (arriba filters
+                              # low-support events; 5/junction produced
+                              # zero reported rows live)
 
 COMPL = str.maketrans("ACGTN", "TGCAN")
 
