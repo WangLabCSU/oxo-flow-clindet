@@ -20,6 +20,7 @@ distinguishable but equally "genomic-looking".
 
 Usage: python3 test/extend_fixture_ref.py
 """
+import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,7 +50,13 @@ def main() -> None:
     names = [n for n, _ in seqs]
     if names == ["chr21"]:
         chr21 = seqs[0][1]
-        chrX = chr21.translate(COMPL)[::-1]  # revcomp: distinct, valid
+        # chrX must NOT be derivable from chr21: a revcomp contig makes
+        # the fusion mates align back to chr21 (live: R2 mapped 150M to
+        # chr21, the chimeric side hard-clipped, arriba saw no split
+        # reads). Seeded random keeps it reproducible and unalignable
+        # from the chr21 reads.
+        rng = random.Random(42)
+        chrX = "".join(rng.choice("ACGT") for _ in range(len(chr21)))
     elif names == ["chr21", "chrX"]:
         chr21, chrX = seqs[0][1], seqs[1][1]
     else:
