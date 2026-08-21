@@ -180,8 +180,11 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/lofreq_raw.vcf" ]
 resources = { threads = 10 }
-description = "lofreq call-parallel (upstream lofreq_call_up; upstream image tag 'lofreq:broken---2.5.1' — VERIFY it resolves live, else pin a clean lofreq image)"
-shell = """lofreq call-parallel --pp-threads {threads} -f {input.ref} -o {output[0]} {input.Tum}"""
+description = "lofreq call-parallel (upstream lofreq_call_up; the upstream 'lofreq:broken---2.5.1' image resolves live from depot.galaxyproject.org — verified 2026-08-22)"
+# rm -f first: lofreq refuses to overwrite an existing VCF ("Cowardly
+# refusing to overwrite", hit live on resume re-runs); snakemake deletes
+# outputs before re-running, the port must replicate that explicitly.
+shell = """rm -f {output[0]} && lofreq call-parallel --pp-threads {threads} -f {input.ref} -o {output[0]} {input.Tum}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/lofreq:broken---2.5.1--py38h1bd3507_2"
 
