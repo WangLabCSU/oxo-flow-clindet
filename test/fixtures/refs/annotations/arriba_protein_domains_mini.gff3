@@ -1,2 +1,3 @@
 chr21	pfam	protein_domain	50	250	0	+	.	Name=mini_domain1;color=#0000FF;gene_id=mini_gene1;gene_name=MINI1;protein_domain_id=PF00001
 chr21	pfam	protein_domain	400	700	0	-	.	Name=mini_domain2;color=#FF0080;gene_id=mini_gene2;gene_name=MINI2;protein_domain_id=PF00002
+chrX	pfam	protein_domain	50	250	0	+	.	Name=mini_domain3;color=#00FF00;gene_id=mini_gene3;gene_name=MINI3;protein_domain_id=PF00003
