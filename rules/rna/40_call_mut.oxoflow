@@ -39,8 +39,10 @@ output = {
 }
 resources = { threads = 1 }
 description = "symlink STAR-mut BAM as the dedup BAM (upstream link_bam, redup=False branch)"
-shell = """ln -s $(realpath {input.bam}) {output.bam}
-ln -s $(realpath {input.bai}) {output.bai}"""
+# ln -sf: idempotent re-runs (upstream uses plain ln -s, which fails when
+# the symlink already exists — observed live on resume after STAR re-ran)
+shell = """ln -sf $(realpath {input.bam}) {output.bam}
+ln -sf $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 
