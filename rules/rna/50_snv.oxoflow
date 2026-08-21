@@ -282,7 +282,10 @@ name = "varscan2_filter_indel"
 input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.vcf" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.filter.vcf" ]
 description = "varscan filter on indels (upstream varscan2_filter_indel)"
-shell = """varscan filter {input.indel} --min-reads2 4 --min-var-freq 0.15 --p-value 0.05 --output-file {output[0]}"""
+# input is a positional array here — {input.indel} never expands (the
+# literal placeholder reached varscan live and hung it on stdin for 7
+# minutes); positional inputs use {input[0]}.
+shell = """varscan filter {input[0]} --min-reads2 4 --min-var-freq 0.15 --p-value 0.05 --output-file {output[0]}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 

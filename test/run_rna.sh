@@ -26,8 +26,11 @@ echo "==> dry-run with the upstream default stages"
 "$OXO" dry-run main_rna.oxoflow "${TARGETS[@]}" > /tmp/oxo-dryrun-rna-$$.txt 2>&1
 grep -q "would execute" /tmp/oxo-dryrun-rna-$$.txt
 
-echo "==> debug: expanded commands contain no literal {config./{pair_id} placeholders"
-if "$OXO" debug main_rna.oxoflow "${TARGETS[@]}" 2>&1 | grep -E '\{config\.|\{pair_id\}' > /dev/null; then
+echo "==> debug: expanded commands contain no literal {config./{pair_id}/{input. placeholders"
+# {input.NAME} with a POSITIONAL input array never expands (hit live:
+# varscan got the literal path and hung on stdin); {config. and {pair_id}
+# are the engine-injected keys.
+if "$OXO" debug main_rna.oxoflow "${TARGETS[@]}" 2>&1 | grep -E '\{config\.|\{pair_id\}|\{input\.' > /dev/null; then
   echo "unexpanded wildcards in debug output"
   exit 1
 fi
