@@ -36,10 +36,17 @@ READS_PER_JUNCTION = 20       # fusion pairs per junction (arriba filters
                               # zero reported rows live)
 
 COMPL = str.maketrans("ACGTN", "TGCAN")
+TRANS = str.maketrans("ACGT", "GTCA")  # transversion for per-read uniqueness
 
 
 def revcomp(seq: str) -> str:
     return seq.translate(COMPL)[::-1]
+
+
+def unique_snp(seq: str, pos: int) -> str:
+    """One transversion at `pos` — makes otherwise-identical synthetic
+    reads distinct (arriba dedups exact duplicates: 20 -> 1, live)."""
+    return seq[:pos] + seq[pos].translate(TRANS) + seq[pos + 1 :]
 
 
 def load_contigs() -> dict[str, str]:
@@ -62,13 +69,22 @@ def find_junctions(donor: str, acceptor: str) -> list[tuple[int, int]]:
     """Return (i, j) with donor GT at donor[i+99:i+101] and acceptor AG
     at acceptor[j-2:j]. Inter-chromosomal: no distance constraint."""
     found = []
-    for i in range(len(donor) - SEG1):
-        if donor[i + SEG1 - 1 : i + SEG1 + 1] != "GT":
-            continue
-        for j in range(2, len(acceptor) - 150):
-            if acceptor[j - 2 : j] != "AG":
+    # The furthest mate slice = j + 12000 + (N-1)*25 + 150 — keep it
+    # inside the contig (an out-of-range slice silently produced short
+    # reads and a malformed fastq, live). The donor must lie inside
+    # mini_gene1/2 (chr21:50-250 / 400-700) and the acceptor inside
+    # mini_gene3 (chrX:400-700): intergenic or boundary breakpoints get
+    # classified as in-vitro/end-to-end artifacts and filtered (live).
+    max_j = len(acceptor) - 12150 - (READS_PER_JUNCTION - 1) * 25
+    donor_spans = [(50, 250), (400, 700)]
+    for lo, hi in donor_spans:
+        for i in range(max(lo, 2), min(hi - SEG1, len(donor) - 150)):
+            if donor[i + SEG1 - 1 : i + SEG1 + 1] != "GT":
                 continue
-            found.append((i, j))
+            for j in range(400, min(700 - SEG2, max_j)):
+                if acceptor[j - 2 : j] != "AG":
+                    continue
+                found.append((i, j))
     return found
 
 
@@ -95,19 +111,34 @@ def main() -> None:
         for jx, (i, j) in enumerate(picks):
             seg1 = donor[i : i + SEG1]
             seg2 = acceptor[j : j + SEG2]
-            # The mate maps at the ACCEPTOR locus: a mate sitting next to
-            # the donor makes STAR resolve the pair as a proper pair and
-            # never attempt chimera detection (observed live: 100M50S with
-            # zero chimeric reads).  A discordant mate is also the real
-            # fusion biology (mates flank the junction from both sides).
-            mate = revcomp(acceptor[j : j + 150])
             for k in range(READS_PER_JUNCTION):
                 n += 1
                 name = f"fusion_{jx}_{k}"
+                # The mate maps on the ACCEPTOR contig, >=12 kb away from
+                # the junction: arriba discards chimeric reads whose mate
+                # sits <=10 kb from the breakpoint as read-through
+                # fragments (live: 1605 -> 4 alignments, zero rows), and
+                # chrX is 20 kb exactly so this structure can exist at
+                # all. A donor-side mate is worse: STAR resolves the pair
+                # as proper and never attempts chimera detection (live:
+                # 0 chimeric reads).
+                #
+                # Per-read variation in TWO dimensions, because arriba
+                # dedups by alignment signature, not sequence: (a) the
+                # mate offset drifts by k*25 bp (insert-size spread,
+                # real-library-like; identical mate positions collapsed
+                # 20 reads to 1 live), (b) one transversion SNP in the
+                # DONOR segment (a SNP in the 50 bp acceptor tail costs
+                # the chimera: 15/20 survived with SNPs spread over the
+                # full read, live).
+                mate = revcomp(
+                    acceptor[j + 12000 + k * 25 : j + 12150 + k * 25])
+                r1_seq = unique_snp(seg1 + seg2, (k * 7) % SEG1)
+                r2_seq = unique_snp(mate, (k * 7) % 150)
                 q1 = "I" * (SEG1 + SEG2)
                 q2 = "I" * 150
-                r1.write(f"@{name}/1\n{seg1 + seg2}\n+\n{q1}\n".encode())
-                r2.write(f"@{name}/2\n{mate}\n+\n{q2}\n".encode())
+                r1.write(f"@{name}/1\n{r1_seq}\n+\n{q1}\n".encode())
+                r2.write(f"@{name}/2\n{r2_seq}\n+\n{q2}\n".encode())
     print(f"appended {n} fusion pairs over {FUSION_COUNT} junctions:")
     for jx, (i, j) in enumerate(picks):
         print(f"  fusion_{jx}: chr21@{i}+{SEG1} -> chrX@{j}+{SEG2}")

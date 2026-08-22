@@ -58,8 +58,11 @@ def main() -> None:
         # itself the output of random.Random(42) from an earlier fixture
         # session — seed 42 reproduced chr21 byte-for-byte (live: two
         # identical contigs, STAR spliced the fusion reads on chr21).
+        # chrX is 20kb so the fusion mates can sit >10kb from the
+        # junction: arriba discards closer same-contig evidence as
+        # read-through fragments (live: 1605 -> 4 alignments, zero rows).
         rng = random.Random(43)
-        chrX = "".join(rng.choice("ACGT") for _ in range(len(chr21)))
+        chrX = "".join(rng.choice("ACGT") for _ in range(20000))
     elif names == ["chr21", "chrX"]:
         chr21, chrX = seqs[0][1], seqs[1][1]
     else:
@@ -92,16 +95,20 @@ def main() -> None:
     (SEQ_DIR / "Homo_sapiens_assembly38_chr21.dict").write_text(
         "\n".join(dict_lines) + "\n")
 
-    # --- GTF: mini_gene3 on chrX (idempotent) --------------------------------
+    # --- GTF: mini_gene3 on chrX (idempotent). Gene-scale sized, NOT
+    # contig-spanning: a whole-contig gene makes every breakpoint sit at
+    # a "gene boundary" and arriba classifies the events as end-to-end
+    # in-vitro artifacts, filtering them all (live: remaining=1 ->
+    # 'end-to-end fusions with low support' -> 0).
     gtf = ANN_DIR / "mini_chr21.gtf"
     text = gtf.read_text()
     if "mini_gene3" not in text:
         gtf.write_text(text + (
-            'chrX\tmini\tgene\t50\t250\t.\t+\t.\tgene_id "mini_gene3"; '
+            'chrX\tmini\tgene\t400\t700\t.\t+\t.\tgene_id "mini_gene3"; '
             'gene_name "MINI3";\n'
-            'chrX\tmini\ttranscript\t50\t250\t.\t+\t.\tgene_id "mini_gene3"; '
+            'chrX\tmini\ttranscript\t400\t700\t.\t+\t.\tgene_id "mini_gene3"; '
             'transcript_id "mini_gene3_t1"; gene_name "MINI3";\n'
-            'chrX\tmini\texon\t50\t250\t.\t+\t.\tgene_id "mini_gene3"; '
+            'chrX\tmini\texon\t400\t700\t.\t+\t.\tgene_id "mini_gene3"; '
             'transcript_id "mini_gene3_t1"; exon_number "1"; gene_name "MINI3";\n'))
 
     # --- protein domains: a domain on mini_gene3 (idempotent) ---------------
@@ -109,7 +116,7 @@ def main() -> None:
     text = pd.read_text()
     if "mini_gene3" not in text:
         pd.write_text(text + (
-            'chrX\tpfam\tprotein_domain\t50\t250\t0\t+\t.\t'
+            'chrX\tpfam\tprotein_domain\t400\t700\t0\t+\t.\t'
             'Name=mini_domain3;color=#00FF00;gene_id=mini_gene3;'
             'gene_name=MINI3;protein_domain_id=PF00003\n'))
 

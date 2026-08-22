@@ -10,6 +10,6 @@ chr21	mini	transcript	400	700	.	-	.	gene_id "mini_gene2"; transcript_id "mini_ge
 chr21	mini	exon	400	480	.	-	.	gene_id "mini_gene2"; transcript_id "mini_gene2_t1"; exon_number "1"; gene_name "MINI2";
 chr21	mini	exon	520	600	.	-	.	gene_id "mini_gene2"; transcript_id "mini_gene2_t1"; exon_number "2"; gene_name "MINI2";
 chr21	mini	exon	640	700	.	-	.	gene_id "mini_gene2"; transcript_id "mini_gene2_t1"; exon_number "3"; gene_name "MINI2";
-chrX	mini	gene	50	250	.	+	.	gene_id "mini_gene3"; gene_name "MINI3";
-chrX	mini	transcript	50	250	.	+	.	gene_id "mini_gene3"; transcript_id "mini_gene3_t1"; gene_name "MINI3";
-chrX	mini	exon	50	250	.	+	.	gene_id "mini_gene3"; transcript_id "mini_gene3_t1"; exon_number "1"; gene_name "MINI3";
+chrX	mini	gene	400	700	.	+	.	gene_id "mini_gene3"; gene_name "MINI3";
+chrX	mini	transcript	400	700	.	+	.	gene_id "mini_gene3"; transcript_id "mini_gene3_t1"; gene_name "MINI3";
+chrX	mini	exon	400	700	.	+	.	gene_id "mini_gene3"; transcript_id "mini_gene3_t1"; exon_number "1"; gene_name "MINI3";
