@@ -1,0 +1,476 @@
+# WES unpaired (tumor-only) mode, ported verbatim from upstream
+# workflow/WES/rules/rtm/unpaired/SNV.smk + SNV/{Mutect2,HaplotypeCaller,
+# varscan2,Strelka,vardict,lofreq,freebayes}.smk + workflow/common/rules/
+# merge_loop.smk (merge_unpaired_vcf, loop_vcf2maf_unpaired,
+# merge_unpaired_maf).
+#
+# Upstream detects unpaired samples from the sample sheet (rows with no
+# Normal fastq); the port ships the same path as a separate workflow
+# (main_unpaired.oxoflow) driven by the tumor-only rows — the engine's
+# pairs_file is paired-oriented, and the RNA port set the precedent of a
+# per-sample-type entry workflow.
+#
+# The port's {pair_id} wildcard plays upstream's {sample}; the '-T' group
+# suffix is kept verbatim, so results land in results/{mapped,dedup,recal,
+# vcf}/unpaired/{pair_id}-T.* exactly as upstream.
+#
+# Upstream gotchas handled here:
+#   - unpaired_mutect2_call: upstream passes -pon from WES_PON (empty string
+#     in the hg38_chr21 mini config would break gatk) — conditional -pon
+#     like the paired port.
+#   - varscan2_merge_unpaired: upstream does bgzip -k + tabix + concat +
+#     reheader; kept verbatim (bgzip -k overwrites existing .gz silently —
+#     guard with rm -f like the lofreq port).
+#   - lofreq unpair_lofreq_filter is a verbatim `cp` upstream — kept.
+#   - unpaired_strelka_filter / unpair_lofreq_filter declare no conda env
+#     upstream — port pins envs/clindet.yaml (bcftools/cp).
+#
+# P1 — NOT PORTED (same evidence as the RNA port header):
+#   - SNV/sage.smk, SNV/deepvariant.smk, SNV/pindel.smk: sage/deepvariant/
+#     cgppindel run in the upstream's custom containers (hmftools.sif /
+#     deepsomatic_160.sif / pindel.sif built for the upstream's Sanger/HMF
+#     reference area, downloadable via the upstream's pull_zenodo run_type)
+#     plus multi-GB resource trees — not shippable as a port; the upstream
+#     shipped default tumor_only_caller is [sage], so these are honored as
+#     documented exclusions.
+#   - WES unpaired CNV (unpaired purple/freec): same custom-container
+#     constraint; the paired CNV subset port covers freec with paired input.
+
+[workflow]
+name = "unpaired"
+
+# ---------------------------------------------------------------- fastp ----
+[[rules]]
+name = "fastp_tumor_sample"
+input = { R1 = "{config.tumor_fastq_r1}", R2 = "{config.tumor_fastq_r2}" }
+output = [
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R1.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R2.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-T-fastp.html",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-T-fastp.json"
+]
+resources = { threads = 10 }
+description = "fastp QC/trimming on tumor reads (upstream fastp_tumor_sample; unpaired samples share the trimmed path)"
+shell = """fastp --thread {threads} -i {input.R1} -I {input.R2} -w 8 -Q -c -L -h {output[2]} -j {output[3]} -o {output[0]} -O {output[1]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# --------------------------------------------------------------- mapping ----
+[[rules]]
+name = "map_reads_tumor"
+input = {
+    R1 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R1.fastq.gz",
+    R2 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R2.fastq.gz"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/mapped/unpaired/{pair_id}-T.sorted.bam" ]
+resources = { threads = 30 }
+description = "bwa mem -MR + fixmate + sort, unpaired path (upstream map_reads with sample_type=unpaired)"
+shell = """[ -f {config.reference}.bwt ] || bwa index {config.reference} # the fixture kit ships the fasta only; build the index on first use
+bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------------- mark duplicates ----
+[[rules]]
+name = "mark_duplicates_tumor"
+input = [ "{config.output_dir}/{config.genome_version}/results/mapped/unpaired/{pair_id}-T.sorted.bam" ]
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bai",
+    metrics = "{config.output_dir}/{config.genome_version}/results/qc/dedup/unpaired/{pair_id}-T.metrics.txt"
+}
+description = "gatk MarkDuplicates on unpaired tumor (upstream default branch)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk MarkDuplicates --CREATE_INDEX true --VALIDATION_STRINGENCY SILENT -I {input[0]} -O {output.bam} -M {output.metrics}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+# ----------------------------------------------------- recal link / BQSR ----
+[[rules]]
+name = "recal_link_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bai"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam.bai"
+}
+description = "symlink unpaired tumor dedup BAM to recal path when recal_BQSR=False"
+when = "!config.recal_bqsr"
+shell = """ln -s $(realpath {input.bam}) {output.bam}
+ln -s $(realpath {input.bai}) {output.bai}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "recalibrate_base_qualities_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bam",
+    ref = "{config.reference}",
+    known_1 = "{config.known_sites1}",
+    known_2 = "{config.known_sites2}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.grp" ]
+description = "gatk BaseRecalibrator on unpaired tumor (upstream recalibrate_base_qualities)"
+when = "config.recal_bqsr"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "apply_base_quality_recalibration_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bam",
+    ref = "{config.reference}",
+    recal_table = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.grp"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam.bai"
+}
+description = "gatk ApplyBQSR + samtools index on unpaired tumor (upstream apply_base_quality_recalibration)"
+when = "config.recal_bqsr"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
+samtools index {output.bam}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+# --------------------------------------------------------------- Mutect2 ----
+[[rules]]
+name = "unpaired_mutect2_call"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    ref = "{config.reference}",
+    bed = "{config.target_bed}",
+    germ_vcf = "{config.mutect2_germline_vcf}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Mutect2_raw.vcf" ]
+resources = { threads = 10 }
+description = "gatk Mutect2 tumor-only (-pon only when a PON is configured; upstream hardcodes -pon WES_PON which is empty in the mini config)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && if [ -n "{config.wes_pon}" ]; then PON_ARG="-pon {config.wes_pon}"; else PON_ARG=""; fi && gatk Mutect2 -R {input.ref} --native-pair-hmm-threads {threads} -I {input.Tum} -O {output[0]} $PON_ARG --germline-resource {input.germ_vcf} --intervals {input.bed}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "M2_filter_unpaired"
+input = {
+    ref = "{config.reference}",
+    vcf = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Mutect2_raw.vcf"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Mutect2.vcf" ]
+resources = { threads = 10 }
+description = "gatk FilterMutectCalls (upstream M2_filter_unpaired)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk FilterMutectCalls -R {input.ref} -V {input.vcf} --stats {input.vcf}.stats -O {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+# ------------------------------------------------------- HaplotypeCaller ----
+[[rules]]
+name = "unpaired_call_variants_HaplotypeCaller"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    ref = "{config.reference}",
+    bed = "{config.target_bed}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/HaplotypeCaller.vcf" ]
+resources = { threads = 10 }
+description = "gatk HaplotypeCaller single-sample (upstream unpaired_call_variants_HaplotypeCaller)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk HaplotypeCaller -R {input.ref} -I {input.Tum} -O {output[0]} --intervals {input.bed} --native-pair-hmm-threads {threads} --annotate-with-num-discovered-alleles -A UniqueAltReadCount -A ReferenceBases -A PossibleDeNovo -A Coverage -A DepthPerAlleleBySample -A DepthPerSampleHC -A StrandBiasBySample -A StrandOddsRatio"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+# ------------------------------------------------------- Strelka + Manta ----
+[[rules]]
+name = "unpaired_call_config_strelka"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    ref = "{config.reference}",
+    bed = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/{pair_id}-Manta.log"
+]
+description = "configManta.py tumor-only + runWorkflow (upstream unpaired_call_config_strelka; same bgzip/tabix + -m local hardening as the paired port)"
+shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
+[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+configManta.py --tumorBam {input.Tum} --runDir {config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Manta --exome --callRegions {input.bed}.gz --referenceFasta {input.ref}
+{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Manta/runWorkflow.py -m local -j {effective_threads} -g 4
+touch {output[1]}"""
+[rules.environment]
+conda = "envs/strelka.yaml"
+
+[[rules]]
+name = "unpaired_call_strelka_manta"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    ref = "{config.reference}",
+    indelcd = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Manta/results/variants/candidateSmallIndels.vcf.gz",
+    bed = "{config.target_bed}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Strelka/results/variants/variants.vcf.gz",
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/{pair_id}-Strelka.log"
+]
+resources = { threads = 8 }
+description = "configureStrelkaGermlineWorkflow on tumor-only (upstream unpaired_call_strelka_manta)"
+shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
+[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+configureStrelkaGermlineWorkflow.py --bam {input.Tum} --referenceFasta {input.ref} --indelCandidates {input.indelcd} --exome --runDir {config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Strelka --callRegions {input.bed}.gz
+{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Strelka/runWorkflow.py -m local -j {effective_threads} -g 4
+touch {output[1]}"""
+[rules.environment]
+conda = "envs/strelka.yaml"
+
+[[rules]]
+name = "unpaired_strelka_filter"
+input = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/{pair_id}-Strelka.log" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/strelka.vcf" ]
+description = "bcftools view PASS on strelka variants (upstream unpaired_strelka_filter; no env upstream — port pins envs/clindet.yaml)"
+shell = """bcftools view -f 'PASS' {config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Strelka/results/variants/variants.vcf.gz -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# --------------------------------------------------------------- varscan2 ----
+[[rules]]
+name = "varscan2_mpileup_unpaired"
+input = {
+    ref = "{config.reference}",
+    tumor = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    regions = "{config.target_bed}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.mp" ]
+resources = { threads = 2 }
+description = "samtools mpileup tumor-only (upstream varscan2_mpileup_unpaired)"
+shell = """samtools mpileup -q 1 -Q 1 -f {input.ref} -l {input.regions} {input.tumor} > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_call_unpaired_snp"
+input = {
+    tumor = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.mp"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/varscan/varscan2.snp.vcf" ]
+description = "varscan mpileup2snp (upstream varscan2_call_unpaired_snp)"
+shell = """varscan mpileup2snp {input.tumor} --output-vcf 1 > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_call_unpaired_indel"
+input = {
+    tumor = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.mp"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/varscan/varscan2.indel.vcf" ]
+description = "varscan mpileup2indel (upstream varscan2_call_unpaired_indel)"
+shell = """varscan mpileup2indel {input.tumor} --output-vcf 1 > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "varscan2_merge_unpaired"
+input = {
+    snp = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/varscan/varscan2.snp.vcf",
+    indel = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/varscan/varscan2.indel.vcf"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/varscan2.vcf",
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/varscan/sample_name.txt"
+]
+description = "bgzip/tabix + bcftools concat + reheader (upstream varscan2_merge_unpaired; rm -f guards the bgzip -k overwrite)"
+shell = """echo -e "Sample1\\t{pair_id}_T" > {output[1]}
+rm -f {input.snp}.gz {input.snp}.gz.tbi {input.indel}.gz {input.indel}.gz.tbi
+bgzip -k {input.snp}
+tabix -p vcf {input.snp}.gz
+bgzip -k {input.indel}
+tabix -p vcf {input.indel}.gz
+bcftools concat -a {input.snp}.gz {input.indel}.gz | bcftools view | bcftools reheader -s {output[1]} -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ---------------------------------------------------------------- vardict ----
+[[rules]]
+name = "unpaired_vardict_single_mode"
+input = {
+    reference = "{config.reference}",
+    regions = "{config.target_bed}",
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/VarDict/{pair_id}.vardict.vcf" ]
+resources = { threads = 10 }
+description = "vardict-java single mode + teststrandbias.R + var2vcf_valid.pl (upstream unpaired_vardict_single_mode, WES)"
+shell = """vardict-java -G {input.reference} -th {threads} -c 1 -S 2 -E 3 -g 4 -N '{pair_id}_T' -b {input.bam} {input.regions} | teststrandbias.R | var2vcf_valid.pl -A -N '{pair_id}_T' -E > {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/vardict-java%3A1.8.3--hdfd78af_0"
+
+[[rules]]
+name = "unpaired_filter_vardict"
+input = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/VarDict/{pair_id}.vardict.vcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/vardict.vcf" ]
+description = "bcftools view PASS (upstream unpaired_filter_vardict, WES)"
+shell = """bcftools view -f 'PASS' {input[0]} -Ov -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ----------------------------------------------------------------- lofreq ----
+[[rules]]
+name = "lofreq_somatic_unpaired"
+input = {
+    reference = "{config.reference}",
+    regions = "{config.target_bed}",
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Lofreq/{pair_id}.lofreq.vcf" ]
+resources = { threads = 10 }
+description = "lofreq call-parallel tumor-only (upstream lofreq_somatic_unpaired; rm -f first — lofreq refuses to overwrite on resume)"
+shell = """rm -f {output[0]} && lofreq call-parallel --pp-threads {threads} -f {input.reference} -l {input.regions} -o {output[0]} {input.Tum} -s"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/lofreq:broken---2.5.1--py38h1bd3507_2"
+
+[[rules]]
+name = "unpair_lofreq_filter"
+input = {
+    ref = "{config.reference}",
+    vcf = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Lofreq/{pair_id}.lofreq.vcf"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/lofreq.vcf" ]
+description = "verbatim cp (upstream unpair_lofreq_filter; no env upstream — port pins envs/clindet.yaml)"
+shell = """cp {input.vcf} {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# -------------------------------------------------------------- freebayes ----
+[[rules]]
+name = "unpaired_freebayes"
+input = {
+    ref = "{config.reference}",
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam.bai",
+    regions = "{config.target_bed}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/freebayes.vcf" ]
+resources = { threads = 10 }
+description = "freebayes pooled-continuous tumor-only (upstream unpaired_freebayes, WES)"
+shell = """freebayes -f {input.ref} -t {input.regions} --min-coverage 10 -C 3 --pooled-continuous {input.bam} > {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/freebayes%3A1.3.9--hbefcdb2_3"
+
+# --------------------------------------------------- VCF merge (upstream) ----
+[[rules]]
+name = "merge_unpaired_vcf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/{caller}.vcf", variables = { caller = "config.unpaired_caller_list", pair_id = "config.pair_ids" } }
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/merge/{pair_id}.vcf" ]
+description = "merge per-caller VCFs (upstream merge_unpaired_vcf + merge_caller_vcfs.py)"
+shell = """python3 scripts/smk.py --script scripts/merge_caller_vcfs.py --input vcfs {input} --param dir {config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id} --output merged_vcf {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------- vcf2maf + MAF merge (VEP tail) ----
+# Upstream loop_vcf2maf_unpaired: --tumor-id {sample}_T --normal-id
+# {sample}_NORMAL (get_vcf_name unpaired/WES branch). Gated on vep_cache_ready
+# like the paired port.
+[[rules]]
+name = "vcf2maf_unpaired_Mutect2"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Mutect2.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/Mutect2.vcf.maf" ]
+description = "vcf2maf on unpaired Mutect2 (upstream get_vcf_name unpaired branch: -T / _NORMAL)"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_unpaired_HaplotypeCaller"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/HaplotypeCaller.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/HaplotypeCaller.vcf.maf" ]
+description = "vcf2maf on unpaired HaplotypeCaller"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_unpaired_strelka"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/strelka.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/strelka.vcf.maf" ]
+description = "vcf2maf on unpaired strelka"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_unpaired_varscan2"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/varscan2.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/varscan2.vcf.maf" ]
+description = "vcf2maf on unpaired varscan2"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_unpaired_vardict"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/vardict.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/vardict.vcf.maf" ]
+description = "vcf2maf on unpaired vardict"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_unpaired_lofreq"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/lofreq.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/lofreq.vcf.maf" ]
+description = "vcf2maf on unpaired lofreq"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "vcf2maf_unpaired_freebayes"
+input = [
+    "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/freebayes.vcf",
+    "{config.reference}"
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/freebayes.vcf.maf" ]
+description = "vcf2maf on unpaired freebayes"
+when = "config.vep_cache_ready"
+shell = """vcf2maf.pl --input-vcf {input[0]} --output-maf {output[0]} --ref-fasta {config.reference} --tumor-id {pair_id}_T --normal-id {pair_id}_NORMAL --vep-path $(realpath $(dirname $(which vep))) --vep-data {config.vep_data} --vep-fork 40 --vep-overwrite --species {config.vep_species} --ncbi-build {config.ncbi_build} --cache-version {config.vep_cache_version}"""
+[rules.environment]
+conda = "envs/clindet_vep.yaml"
+
+[[rules]]
+name = "merge_unpaired_maf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.unpaired_caller_list", pair_id = "config.pair_ids" } }
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/merge/{pair_id}.maf" ]
+description = "merge per-caller MAFs (upstream merge_unpaired_maf + merge_maf.R)"
+when = "config.vep_cache_ready"
+shell = """Rscript scripts/smk.R --script scripts/merge_maf.R --input maf1 {input} --param dir {config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id} --output maf {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"

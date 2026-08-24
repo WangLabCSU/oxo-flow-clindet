@@ -96,6 +96,26 @@ Same samplesheet and fixture kit as the DNA path; the vcf2maf/MAF tail gates
 on `vep_cache_ready` (see `[config]`). Deviations are documented in the
 `rules/rna/*.oxoflow` headers.
 
+## Unpaired (tumor-only) sub-workflow
+
+`main_unpaired.oxoflow` ports the upstream **WES unpaired branch**
+(`workflow/WES/rules/rtm/unpaired`, driven upstream by sample-sheet rows
+without Normal fastqs): fastp → bwa → markdup → recal (link or BQSR) →
+seven tumor-only callers (Mutect2 + FilterMutectCalls, HaplotypeCaller,
+varscan2, Strelka+Manta germline, vardict, lofreq, freebayes) →
+`merge_unpaired_vcf` (verbatim `merge_caller_vcfs.py` via `scripts/smk.py`),
+plus the VEP-gated vcf2maf/MAF tail. The upstream shipped default
+`tumor_only_caller: [sage]` and the deepvariant/pindel unpaired callers run
+in the upstream's custom containers (hmftools/deepsomatic/pindel sif +
+multi-GB HMF/Sanger resource trees) — documented as exclusions in
+`rules/70_unpaired.oxoflow`; the port defaults to the seven
+conda/container-portable callers instead.
+
+```bash
+oxo-flow dry-run main_unpaired.oxoflow   # 21 run / 11 skip under default config
+oxo-flow run main_unpaired.oxoflow -j 8
+```
+
 ## Fidelity
 
 | Upstream process/rule | oxo-flow rule | Tool (version) | Notes |
@@ -126,6 +146,7 @@ on `vep_cache_ready` (see `[config]`). Deviations are documented in the
 | loop_vcf2maf_paired | `vcf2maf_{Mutect2,vardict,varscan2,muse,HaplotypeCaller}` | vcf2maf 1.6.22, ensembl-vep 114.2 | verbatim tumor/normal IDs per `get_vcf_name`; gated on `vep_cache_ready` |
 | loop_vcf2maf_germ_paired | `vcf2maf_germ_strelkamanta` / `vcf2maf_germ_caveman` | vcf2maf 1.6.22 | TUMOUR/NORMAL for CaVEMan; gated on `vep_cache_ready` |
 | merge_loop (somatic) | `merge_paired_maf` | merge_maf.R (verbatim) | driven via scripts/smk.R shim |
+| merge_paired_vcf | `merge_paired_vcf` | merge_caller_vcfs.py (verbatim) + pysam | driven via scripts/smk.py shim; upstream mini-test default stage `call_mut_vcf` |
 | merge_loop_germline | `merge_paired_germ_maf` | merge_maf.R (verbatim) | |
 | make_region_bed_list + flag_mutation_pairead_maf | `make_region_bed_list` + `flag_mutation_pairead_maf` | flag_mutation_maf.R (verbatim) | empty bed_list = header-only TSV |
 | run_cancer_report | `run_cancer_report` | R >=4.4 (knitr, gpgr via post-deploy) | only MAF/panel/Rmd params; CNV/QC params unset (NULL) as in upstream default path |
@@ -137,8 +158,10 @@ hmftools container plus the multi-GB hmf_pipeline_resources tree;
 ASCAT/FACETS/sequenza/freec/exomedepth are ported or in progress), extended
 SV branch (delly/gridss/svaba/BRASS/linx/igv-caller/jasmine — gridss/BRASS/
 linx/igv-caller/jasmine require the upstream's custom containers and
-Sanger/HMF reference trees), WES unpaired (single-sample) mode (in
-progress; the RNA-side unpaired callers are ported in `main_rna.oxoflow`).
+Sanger/HMF reference trees), WGS run type (mapping/SNV/CNV/SV for
+whole-genome inputs — in progress), non-human genomes (WBcel235/mm10
+entries in the upstream `genomes.yaml` — config-level support, in
+progress).
 
 ## Source
 

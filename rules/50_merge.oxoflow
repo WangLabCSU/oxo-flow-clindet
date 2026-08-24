@@ -7,6 +7,20 @@
 [workflow]
 name = "merge"
 
+# ------------------------------------------------ somatic VCF merge (upstream)
+# Upstream merge_paired_vcf (merge_loop.smk) — the mini-test default stage
+# call_mut_vcf. Driven via scripts/smk.py + merge_caller_vcfs.py verbatim.
+[[rules]]
+name = "merge_paired_vcf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/{caller}.vcf", variables = { caller = "config.somatic_caller_list", pair_id = "config.pair_ids" } }
+]
+output = [ "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf" ]
+description = "merge per-caller normalized VCFs (upstream merge_paired_vcf + merge_caller_vcfs.py)"
+shell = """python3 scripts/smk.py --script scripts/merge_caller_vcfs.py --input vcfs {input} --param dir {config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id} --output merged_vcf {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
 # ------------------------------------------------------- somatic MAF merge ----
 [[rules]]
 name = "merge_paired_maf"

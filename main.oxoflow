@@ -102,11 +102,20 @@ path = "rules/50_merge.oxoflow"
 path = "rules/60_report.oxoflow"
 
 # ---------------------------------------------------------------------------
-# Target: merged somatic + germline MAF, flagged MAF, cancer report, MultiQC.
-# (Deviation from upstream mini-test default [stages=call_mut_vcf]: the port
-# target additionally builds the germline MAF, mutation flagging and the two
-# reports — see README Fidelity.)
+# Targets: merge_paired_vcf (upstream mini-test default stage call_mut_vcf,
+# ungated — no VEP needed) plus the VEP-gated `all` tail below (merged
+# somatic + germline MAF, flagged MAF, cancer report, MultiQC). The port
+# `all` additionally builds the germline MAF, mutation flagging and the two
+# reports vs upstream's [stages=call_mut_vcf] — see README Fidelity.
 # ---------------------------------------------------------------------------
+[[rules]]
+name = "all_vcf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf", variables = { pair_id = "config.pair_ids" } }
+]
+output = ["{config.output_dir}/{config.genome_version}/results/all_vcf.done"]
+shell = "touch {output[0]}"
+
 [[rules]]
 name = "all"
 expand_inputs = [
