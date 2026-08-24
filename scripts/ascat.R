@@ -50,6 +50,11 @@ if(genome_version == 'T2T'){
 } else if (genome_version == 'b37'){
   genome_version = 'hg19'
   f_gv = 'hg19'
+} else if (genome_version == 'hg38_chr21'){
+  # mini fixture: hg38 chr21 — ASCAT only accepts hg19/hg38/CHM13 in
+  # getBAFsAndLogRs; the reference is a fragment of GRCh38, so hg38 is
+  # the correct genome-version value
+  f_gv = 'hg38'
 } else {
   f_gv = genome_version
 }

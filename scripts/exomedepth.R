@@ -40,7 +40,7 @@ if (use_target_bed) {
     colnames(target.df) <- c('chromosome', 'start', 'end')[seq_len(ncol(target.df))]
     my.counts <- getBamCounts(bed.frame = target.df,
             bam.files = bam.files,
-            include.chr = TRUE,
+            include.chr = FALSE,  # the target BED already carries chr-prefixed names
             referenceFasta = reference.file)
 
 } else if(genome_version == 'b37'){

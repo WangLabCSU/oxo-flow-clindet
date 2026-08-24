@@ -46,12 +46,15 @@ input = {
     bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     ref = "{config.reference}"
 }
-output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.txt" ]
+output = [
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.txt",
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.pdf"
+]
 resources = { memory_mb = 1024 }
-description = "gatk CollectInsertSizeMetrics tumor (upstream WGS picard_flength_wgs; the -H histogram PDF needs R, which the gatk4 image lacks — the port emits the metrics table only)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
+description = "picard CollectInsertSizeMetrics tumor (upstream WGS picard_flength_wgs; -H is REQUIRED and needs R — the gatk4 image has no R, so the port runs the bioconda picard from envs/clindet.yaml which bundles R; live-verified)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
 [rules.environment]
-singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "picard_flength_wgs_normal"
@@ -59,12 +62,15 @@ input = {
     bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
     ref = "{config.reference}"
 }
-output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.txt" ]
+output = [
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.txt",
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.pdf"
+]
 resources = { memory_mb = 1024 }
-description = "gatk CollectInsertSizeMetrics normal (upstream WGS picard_flength_wgs; no -H PDF — the gatk4 image lacks R)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
+description = "picard CollectInsertSizeMetrics normal (upstream WGS picard_flength_wgs; -H via the R-bundled bioconda picard, live-verified)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
 [rules.environment]
-singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+conda = "envs/clindet.yaml"
 
 # ------------------------------------------------------------ delly ----
 [[rules]]
