@@ -233,6 +233,20 @@ bash test/run.sh      # DNA: validate + lint + dry-run, exits 0
 bash test/run_rna.sh  # RNA: validate + lint + dry-run (default stages), exits 0
 ```
 
+## Live verification (tx-ubuntu, oxo-flow 0.14.1)
+
+| Workflow | Status | Notes |
+|---|---|---|
+| paired WES (`main.oxoflow`) | ✅ live-verified | full pipeline on the mini fixture, incl. opt-in BQSR (`recal_bqsr=true`) and the CNV subset (`cnv_enabled=true`: Control-FREEC, Sequenza, ExomeDepth, ASCAT) |
+| unpaired WES (`main_unpaired.oxoflow`) | ✅ live-verified ×2 | 7 tumor-only callers + merge |
+| WGS (`main_wgs.oxoflow`) | ✅ live-verified | WGS metrics, delly SV chain (incl. germ), svaba, Manta somaticSV, MuSE/Strelka2 WGS configs |
+| RNA (`main_rna.oxoflow`) | ✅ live-verified | arriba/TRUST4/isofox default stages |
+
+Mini-fixture degeneracy (900 bp chr21 + 20 kb chrX) is handled with
+documented fallbacks where a tool needs real signal (ExomeDepth/ASCAT/
+Control-FREEC/Sequenza fit write header-only outputs + a provenance note);
+real-data runs take the verbatim upstream path. See the Fidelity section.
+
 ## License
 
 Apache-2.0. Copyright (c) 2026 oxo-flow-community.
