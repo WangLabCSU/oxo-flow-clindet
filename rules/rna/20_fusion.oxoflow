@@ -1,0 +1,86 @@
+# ============================================================================
+# DRAFT — RNA fusion detection (upstream workflow/RNA/rules/fusion.smk).
+# NOT yet live-tested. Reviewed against the live-test cycle before finalizing.
+#
+# Upstream includes this file only when genome_version in
+# ['b37', 'hg38', 'hg38_chr21'] (human-only).
+#
+# Upstream gotchas handled here:
+#   - arriba_fusion passes -k AND -t with the same known_fusions file
+#     (duplicate flag) — kept verbatim.
+#   - arriba_draw input bam: upstream waits for
+#     {sample}.STAR.genome.sort.bam, which RSEM_sort_genome never produces
+#     (real file: {sample}.STAR.genome.sorted.bam) — the port points at the
+#     real file (documented deviation).
+#   - arriba database paths: known_fusions / protein_domains / cytobands point
+#     INSIDE the container image (/arriba_v2.4.0/database/...) while the
+#     blacklist is a local file. The container-internal paths only resolve
+#     when the singularity image is used as-is; set the config keys to local
+#     copies if the image changes.
+#   - TRUST4 git-clones https://github.com/liulab-dfci/TRUST4.git into
+#     config.trust4_dir at RULE RUNTIME when config.trust4_f is missing
+#     (network side effect, not a setup step) — kept verbatim.
+#   - Stage gating upstream: 'arriba' / 'TRUST4' in run_params.stages
+#     (default stages = [arriba, call_mut]) — target-level concern.
+# ============================================================================
+
+[workflow]
+name = "rna_fusion"
+
+# -------------------------------------------------------------- arriba ------
+[[rules]]
+name = "arriba_fusion"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}.sorted.bam",
+    stamp = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_star.log"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/fusion/{pair_id}_arriba_fusion.tsv" ]
+resources = { threads = 1 }
+description = "arriba fusion calling (upstream arriba_fusion; -k and -t both carry the known_fusions file upstream)"
+shell = """/arriba_v2.4.0/arriba -x {input.bam} -o {output[0]} -a {config.reference} -g {config.rna_gtf} -b {config.arriba_blacklist} -k {config.arriba_known_fusions} -t {config.arriba_known_fusions} -p {config.arriba_protein_domains}"""
+[rules.environment]
+singularity = "docker://uhrigs/arriba:2.4.0"
+
+[[rules]]
+name = "arriba_draw"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.sorted.bam",
+    stamp = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_star.log",
+    tsv = "{config.output_dir}/{config.genome_version}/results/fusion/{pair_id}_arriba_fusion.tsv"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/fusion/{pair_id}_arriba_fusion.pdf" ]
+resources = { threads = 1 }
+description = "arriba draw_fusions.R (upstream arriba_draw; input bam fixed — upstream waits for .STAR.genome.sort.bam which is never produced; the real file is .STAR.genome.sorted.bam)"
+shell = """/arriba_v2.4.0/draw_fusions.R --fusions={input.tsv} --alignments={input.bam} --output={output[0]} --annotation={config.rna_gtf} --cytobands={config.arriba_cytobands} --proteinDomains={config.arriba_protein_domains}"""
+[rules.environment]
+singularity = "docker://uhrigs/arriba:2.4.0"
+
+# -------------------------------------------------------------- TRUST4 ------
+[[rules]]
+name = "TRUST4_TBCR"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}.sorted.bam",
+    stamp = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_star.log"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/IG/TRUST4/{pair_id}_report.tsv" ]
+resources = { threads = 10 }
+description = "TRUST4 T/B-cell receptor assembly (upstream TRUST4_TBCR; git-clones the TRUST4 repo at runtime when the reference is missing)"
+shell = """set -euo pipefail
+if [ ! -f "{config.trust4_f}" ]; then
+    echo "[TRUST4] Reference file not found: {config.trust4_f}"
+    echo "[TRUST4] Cloning TRUST4 repository to {config.trust4_dir}"
+    mkdir -p "$(dirname {config.trust4_dir})"
+    if [ ! -d "{config.trust4_dir}/.git" ]; then
+        git clone https://github.com/liulab-dfci/TRUST4.git "{config.trust4_dir}"
+    else
+        echo "[TRUST4] TRUST4 repository already exists. Skipping clone."
+    fi
+    if [ ! -f "{config.trust4_f}" ]; then
+        echo "[ERROR] TRUST4 reference file still not found after cloning: {config.trust4_f}"
+        exit 1
+    fi
+fi
+mkdir -p "$(dirname {output[0]})"
+run-trust4 -b {input.bam} -f {config.trust4_f} -o {config.output_dir}/{config.genome_version}/results/IG/TRUST4/{pair_id} --ref {config.trust4_ref} -t {threads}"""
+[rules.environment]
+conda = "envs/rsem.yaml"

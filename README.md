@@ -69,6 +69,33 @@ oxo-flow run main.oxoflow -j 8
 The samplesheet (`samplesheet.csv`) holds one `pair_id` per tumor/normal
 pair: columns `pair_id,experiment,control,experiment_type`.
 
+## RNA sub-workflow
+
+`main_rna.oxoflow` ports the upstream **workflow/RNA** entry
+(`wrapper/rna.smk`, run_type `rna`): fastp → STAR (arriba + mutation maps) →
+arriba fusion calling → SplitNCigarReads → unpaired SNV callers → VEP-gated
+vcf2maf/MAF merge tail. The upstream mini-test default stages (`arriba`,
+`call_mut`) map to explicit rule targets; the RSEM/kallisto/salmon/TRUST4
+quant rules and isofox are not in the default stages upstream and run only
+when targeted:
+
+```bash
+# preview / run the default stages (arriba + call_mut)
+oxo-flow dry-run main_rna.oxoflow \
+  -t fastp_trim -t STAR_1_pass -t STAR_arriba_map -t STAR_mut_map \
+  -t arriba_fusion -t link_bam -t SplitNCigarReads \
+  -t mutect2 -t M2_filter -t unpaired -t call_variants -t lofreq \
+  -t varscan2 -t norm_filter
+oxo-flow run main_rna.oxoflow -j 8 <same -t flags>
+
+# quant extras (need rsem/kallisto/salmon indexes — empty in the fixture kit)
+oxo-flow run main_rna.oxoflow -t cal_exp_RSEM -t kallisto -t salmon -t TRUST4_TBCR
+```
+
+Same samplesheet and fixture kit as the DNA path; the vcf2maf/MAF tail gates
+on `vep_cache_ready` (see `[config]`). Deviations are documented in the
+`rules/rna/*.oxoflow` headers.
+
 ## Fidelity
 
 | Upstream process/rule | oxo-flow rule | Tool (version) | Notes |
@@ -119,7 +146,8 @@ upstream releases**. Attribution in `NOTICE.md`; upstream license in
 ## Test
 
 ```bash
-bash test/run.sh   # validate + lint + dry-run, exits 0
+bash test/run.sh      # DNA: validate + lint + dry-run, exits 0
+bash test/run_rna.sh  # RNA: validate + lint + dry-run (default stages), exits 0
 ```
 
 ## License

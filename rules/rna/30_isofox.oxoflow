@@ -1,0 +1,59 @@
+# ============================================================================
+# DRAFT — RNA isofox expression/fusion metrics (upstream workflow/RNA/rules/isofox.smk).
+# NOT yet live-tested. Reviewed against the live-test cycle before finalizing.
+#
+# Upstream includes this file only when genome_version in ['b37', 'hg38']
+# (human-only; hg38_chr21 is NOT in the list upstream — these rules are
+# defined for full genomes only).
+#
+# Upstream gotchas handled here:
+#   - STAR_isofox_map shell has a broken token upstream:
+#       --outFilterMismatchNmax 3 limitOutSJcollapsed 3000000
+#     (limitOutSJcollapsed missing its leading --, making it a positional
+#     STAR argument) — fixed to --limitOutSJcollapsed 3000000.
+#   - isofox_call needs the hmftools ensembl_data_dir resource tree
+#     (config.hmftools_ensembl_data_dir, multi-GB, not shipped in the
+#     mini-test) and the sage ref_genome_version (38 for hg38).
+#   - isofox memory: upstream derives mem_mb from the input bam size
+#     (max(1.5x, 300) MB); the port uses a config key (config.isofox_mem_mb,
+#     e.g. 30000 = 30 GB).
+# ============================================================================
+
+[workflow]
+name = "rna_isofox"
+
+[[rules]]
+name = "STAR_isofox_map"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/{pair_id}.sorted.bam",
+    unsort_bam = "{config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/Aligned.out.bam"
+}
+resources = { threads = 10, memory = "3000M" }
+description = "STAR re-alignment with isofox-specific flags + addreplacerg + sort (upstream STAR_isofox_map)"
+shell = """STAR --genomeDir {config.star_index} --runThreadN={threads} --outSAMtype BAM Unsorted --outFileNamePrefix {config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/ --outReadsUnmapped Fastx --sjdbGTFfile {config.rna_gtf} --outSAMunmapped Within --outBAMcompression 0 --outSAMattributes All --outFilterMultimapNmax 10 --outFilterMismatchNmax 3 --limitOutSJcollapsed 3000000 --chimSegmentMin 10 --chimOutType WithinBAM SoftClip --chimJunctionOverhangMin 10 --chimSegmentReadGapMax 3 --chimScoreMin 1 --chimScoreDropMax 30 --chimScoreJunctionNonGTAG 0 --chimScoreSeparation 1 --outFilterScoreMinOverLread 0.33 --outFilterMatchNminOverLread 0.33 --outFilterMatchNmin 35 --alignSplicedMateMapLminOverLmate 0.33 --alignSplicedMateMapLmin 35 --alignSJstitchMismatchNmax 5 -1 5 5 --readFilesIn {input.R1} {input.R2} --readFilesCommand gunzip -c
+samtools addreplacerg -@ {threads} -r 'ID:{pair_id}' -r 'PL:ILLUMINA.NovaSeq' -r 'LB:RNA-Seq' -r 'SM:{pair_id}' -o {config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/addRG.bam {config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/Aligned.out.bam
+samtools sort -@ {threads} -m $(({effective_memory_mb} / 4 / {threads}))M -o {output.bam} {config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/addRG.bam
+samtools index {output.bam}
+rm {config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/addRG.bam"""
+[rules.environment]
+conda = "envs/rsem.yaml"
+
+[[rules]]
+name = "isofox_call"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/{pair_id}.sorted.bam",
+    ref_genome = "{config.reference}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/{pair_id}.isf.fusions.csv",
+    "{config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/{pair_id}.isf.gene_data.csv"
+]
+resources = { threads = 10 }
+description = "isofox transcript counts + fusions (upstream isofox_call; needs the hmftools ensembl_data_dir resource tree)"
+shell = """isofox -Xms{config.isofox_mem_mb}m -Xmx{config.isofox_mem_mb}m -sample {pair_id} -functions "TRANSCRIPT_COUNTS;ALT_SPLICE_JUNCTIONS;FUSIONS" -ref_genome_version {config.sage_ref_genome_version} -bam_file {input.bam} -ref_genome {input.ref_genome} -ensembl_data_dir {config.hmftools_ensembl_data_dir} -output_dir {config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id} -threads {threads}"""
+[rules.environment]
+conda = "envs/hmftools.yaml"

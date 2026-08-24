@@ -21,3 +21,6 @@ jobs:
 
       - name: Validate, lint, dry-run
         run: bash ./test/run.sh
+
+      - name: Validate, lint, dry-run (RNA)
+        run: bash ./test/run_rna.sh

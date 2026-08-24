@@ -1,0 +1,69 @@
+# ============================================================================
+# DRAFT — RNA QC rules (upstream workflow/RNA/rules/qc.smk). NOT yet
+# live-tested. Reviewed against the live-test cycle before finalizing.
+#
+# Upstream rule: fastp_trim, single-sample (RNA has no tumor/normal split).
+# The port's {pair_id} wildcard plays upstream's {sample} (RNA samplesheet
+# row: Sample_name = pair_id "mini").
+#
+# Upstream gotchas handled here:
+#   - conda key typo config['conda']['clindet_mian'] (missing 'n') — the
+#     flexible_conda_env fallback silently uses envs/clindet.yaml; port pins
+#     envs/clindet.yaml directly.
+#   - params.adapters / params.extra defined but never used in the shell —
+#     dropped.
+#   - shell hardcodes fastp write threads -w 16 while rule threads = 2 —
+#     kept verbatim.
+#   - upstream marks the trimmed fastqs temp() (deleted after consumption);
+#     the port keeps them as regular outputs (first rule of the chain).
+#
+# NEW [config] keys required by the RNA port (draft; to be added to
+# main.oxoflow [config] when the RNA path is wired in):
+#   rna_fastq_r1 / rna_fastq_r2   RNA reads (upstream samplesheet R1/R2_file_path)
+#   rna_gtf                       upstream resources[genome].GTF
+#   star_index                    upstream softwares_params[genome].star.index
+#   rsem_index / kallisto_index / salmon_index   (empty in the hg38_chr21 test config)
+#   trust4_ref / trust4_f / trust4_dir           (TRUST4, git-cloned at runtime)
+#   arriba_blacklist / arriba_known_fusions / arriba_protein_domains / arriba_cytobands
+#   hmftools_ensembl_data_dir     upstream softwares_params[genome].hmftools.purple.ensembl_data_dir
+#   sage_ref_genome_version / sage_coverage_bed / sage_hotspots / sage_panel_bed /
+#   sage_high_confidence_bed      (hmftools sage resources — P1, see 50_snv)
+#   rna_edit_vcf                  upstream resources[genome].RNA_EDIT_VCF (empty upstream;
+#                                 only the P1 sentieon chain consumes it)
+#   rna_caller_list               upstream run_params.rna_caller_list
+#                                 (default: freebayes, HaplotypeCaller, lofreq,
+#                                  Mutect2, vardict, varscan2)
+#   isofox_mem_mb                 isofox -Xmx (upstream derives it from input bam size)
+#
+# REUSED existing keys: output_dir, genome_version, reference, target_bed,
+#   java_temp_dir, wes_pon, mutect2_germline_vcf, vep_data, vep_cache_version,
+#   vep_species, ncbi_build, vep_cache_ready, pair_ids.
+#
+# NEW env files needed (not yet in the port):
+#   envs/rsem.yaml    upstream envs/rsem.yaml (name clindet_rsem):
+#                     rsem>=1.3.3, bowtie2>=2.5.4, samtools>=1.22.1,
+#                     star>=2.7.11b, kallisto, salmon>=1.10.3, trust4>=1.1.5
+#   envs/hmftools.yaml  bioconda hmftools-{sage=4.0, pave=1.7.1, isofox=1.7.2, ...}
+#   Existing port envs cover clindet / clindet_mut / clindet_vep / strelka.
+# ============================================================================
+
+[workflow]
+name = "rna_qc"
+
+[[rules]]
+name = "fastp_trim"
+input = {
+    R1 = "{config.rna_fastq_r1}",
+    R2 = "{config.rna_fastq_r2}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}_R1.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}_R2.fastq.gz",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-fastp.html",
+    "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-fastp.json"
+]
+resources = { threads = 2 }
+description = "fastp QC/trimming on RNA reads (upstream fastp_trim; unused adapters/extra params dropped)"
+shell = """fastp --thread {threads} -i {input.R1} -I {input.R2} -w 16 -Q -c -L -h {output[2]} -j {output[3]} -o {output[0]} -O {output[1]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
