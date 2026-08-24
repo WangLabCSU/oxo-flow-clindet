@@ -1,10 +1,11 @@
 # sequenza-utils (bam2seqz/seqz_binning). r-sequenza lives in its own env
-# (envs/sequenza_r.yaml): installing both together makes the python
-# `sequenza` package shadow sequenza-utils' commands module (live:
-# 'conflicting subparser: bam2seqz').
+# (envs/sequenza_r.yaml). python pinned to 3.10: the sequenza-utils 3.0.0
+# py312 build double-registers its subparsers (live: 'conflicting
+# subparser: bam2seqz').
 name: sequenza
 channels:
   - conda-forge
   - bioconda
 dependencies:
+  - python=3.10
   - sequenza-utils>=3.0.0
