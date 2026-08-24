@@ -1,11 +1,10 @@
-# sequenza-utils (bam2seqz/seqz_binning) + r-sequenza (fit/results).
-# Upstream runs both steps in a custom sequenza container; bioconda ships
-# the same tools natively.
+# sequenza-utils (bam2seqz/seqz_binning). r-sequenza lives in its own env
+# (envs/sequenza_r.yaml): installing both together makes the python
+# `sequenza` package shadow sequenza-utils' commands module (live:
+# 'conflicting subparser: bam2seqz').
 name: sequenza
 channels:
   - conda-forge
   - bioconda
 dependencies:
   - sequenza-utils>=3.0.0
-  - r-sequenza>=3.0.0
-  - r-base

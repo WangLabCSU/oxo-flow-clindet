@@ -1,0 +1,9 @@
+# r-sequenza (fit/results) — separate env from sequenza-utils, see
+# envs/sequenza.yaml for the reason.
+name: sequenza_r
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-sequenza>=3.0.0
+  - r-base

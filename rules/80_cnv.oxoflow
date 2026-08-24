@@ -125,7 +125,7 @@ description = "sequenza fit + results (upstream sequenza_call; upstream's refere
 when = "config.cnv_enabled"
 shell = """Rscript scripts/smk.R --script scripts/sequenza_call.R --input bin_seqz {input[0]} --param wd {config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id} --output segment {output[0]}"""
 [rules.environment]
-conda = "envs/sequenza.yaml"
+conda = "envs/sequenza_r.yaml"
 
 # ------------------------------------------------------------ ExomeDepth ----
 [[rules]]
