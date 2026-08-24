@@ -211,7 +211,7 @@ description = "gatk ApplyBQSR + samtools index on tumor (upstream apply_base_qua
 when = "config.recal_bqsr"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
 gatk BuildBamIndex -I {output.bam}
-mv "$(echo {output.bam} | sed 's/\.bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""
+mv "$(echo {output.bam} | sed 's/[.]bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
@@ -230,7 +230,7 @@ description = "gatk ApplyBQSR + samtools index on normal (upstream apply_base_qu
 when = "config.recal_bqsr"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
 gatk BuildBamIndex -I {output.bam}
-mv "$(echo {output.bam} | sed 's/\.bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""
+mv "$(echo {output.bam} | sed 's/[.]bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
