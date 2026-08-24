@@ -1,0 +1,10 @@
+# Control-FREEC + sambamba (upstream runs freec inside the custom
+# facets-suite container with sambamba for read extraction; bioconda ships
+# both — the port runs them natively).
+name: freec
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - control-freec>=11.6
+  - sambamba>=1.0

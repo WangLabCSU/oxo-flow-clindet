@@ -28,18 +28,46 @@ class _Slot:
         self._items = []
         self._scalar_when_single = scalar_when_single
 
-    def __getattr__(self, name):
+    def _resolve(self, name):
         # Upstream scripts read snakemake.input.* as lists (expand(...))
         # and snakemake.output.*/params.* as scalars.
         values = [v for (n, v) in self._items if n == name]
         if not values:
-            raise AttributeError(f"snakemake slot '{name}' was not provided")
+            raise KeyError(name)
         flat = values[0] if len(values) == 1 else [
             item for vals in values for item in vals
         ]
         if self._scalar_when_single and len(flat) == 1:
             return flat[0]
         return flat
+
+    def __getattr__(self, name):
+        try:
+            return self._resolve(name)
+        except KeyError:
+            raise AttributeError(
+                f"snakemake slot '{name}' was not provided"
+            ) from None
+
+    # dict-style access (upstream config_freec.py uses
+    # snakemake.input['ini_template'] / snakemake.input.keys()): single-file
+    # slots resolve to scalars, matching real Snakemake.
+    def __getitem__(self, name):
+        values = [v for (n, v) in self._items if n == name]
+        if not values:
+            raise KeyError(name)
+        flat = values[0] if len(values) == 1 else [
+            item for vals in values for item in vals
+        ]
+        if len(flat) == 1:
+            return flat[0]
+        return flat
+
+    def keys(self):
+        return [n for (n, _v) in self._items]
+
+    def __contains__(self, name):
+        return any(n == name for (n, _v) in self._items)
 
     def __setattr__(self, name, value):
         if name in ("_items", "_scalar_when_single"):

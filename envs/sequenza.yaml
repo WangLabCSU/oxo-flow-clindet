@@ -1,0 +1,11 @@
+# sequenza-utils (bam2seqz/seqz_binning) + r-sequenza (fit/results).
+# Upstream runs both steps in a custom sequenza container; bioconda ships
+# the same tools natively.
+name: sequenza
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - sequenza-utils>=3.0.0
+  - r-sequenza>=3.0.0
+  - r-base

@@ -151,17 +151,21 @@ oxo-flow run main_unpaired.oxoflow -j 8
 | make_region_bed_list + flag_mutation_pairead_maf | `make_region_bed_list` + `flag_mutation_pairead_maf` | flag_mutation_maf.R (verbatim) | empty bed_list = header-only TSV |
 | run_cancer_report | `run_cancer_report` | R >=4.4 (knitr, gpgr via post-deploy) | only MAF/panel/Rmd params; CNV/QC params unset (NULL) as in upstream default path |
 | combined_multiqc | `prep_multiqc_data` + `combined_multiqc_prep_multiqc_data` + `combined_multiqc` | multiqc | conpair/purple inputs out of scope |
+| freec_config / freec_call_paired / plot_freec | `freec_config` / `freec_call_paired` / `plot_freec` | Control-FREEC >=11.6, sambamba | verbatim `config_freec.py` + `config_exome.ini`; upstream runs freec in the facets-suite container, port uses bioconda control-freec; `when = "config.cnv_enabled"` |
+| sequenza bam2seqz/binning/call | `sequenza_bam2seqz` / `sequenza_seqz_binning` / `sequenza_call` | sequenza-utils, r-sequenza | upstream's referenced `scripts/sequenza.R` does not exist in the tree — port ships the standard extract→fit→results chain (`scripts/sequenza_call.R`) |
+| CNA_exomedepth | `CNA_exomedepth` | ExomeDepth (Bioc) | verbatim `ExomeDepth.R`; upstream counts over hardcoded exons.hg19 (dead `target.file` read) — port keeps that and adds a documented `use_target_bed` switch for the mini fixture |
+| CNA_ASCAT / ASCAT_EXTRACT_PURITYPLOIDY | `CNA_ASCAT` / `ASCAT_EXTRACT_PURITYPLOIDY` | ASCAT >=3.2, alleleCounter | verbatim `ASCAT.R` (+chroms/GC/rt from config — upstream hardcodes c(1:22)); `ascat_pp.R` verbatim |
 
 **Not ported** (upstream branches outside the default paired WES path, with
-reasons): CNV branch (purple/amber/cobalt need the upstream's custom
-hmftools container plus the multi-GB hmf_pipeline_resources tree;
-ASCAT/FACETS/sequenza/freec/exomedepth are ported or in progress), extended
-SV branch (delly/gridss/svaba/BRASS/linx/igv-caller/jasmine — gridss/BRASS/
-linx/igv-caller/jasmine require the upstream's custom containers and
-Sanger/HMF reference trees), WGS run type (mapping/SNV/CNV/SV for
-whole-genome inputs — in progress), non-human genomes (WBcel235/mm10
-entries in the upstream `genomes.yaml` — config-level support, in
-progress).
+reasons): CNV purple/amber/cobalt (HMF — the upstream's custom hmftools
+container plus the multi-GB hmf_pipeline_resources tree; dryclean has no
+rule file upstream) and FACETS/facets-suite (custom facets-suite-dev.img,
+requires compiling cnv_facets C++); extended SV branch
+(delly/gridss/svaba/BRASS/linx/igv-caller/jasmine — gridss/BRASS/linx/
+igv-caller/jasmine require the upstream's custom containers and Sanger/HMF
+reference trees), WGS run type (mapping/SNV/CNV/SV for whole-genome
+inputs — in progress), non-human genomes (WBcel235/mm10 entries in the
+upstream `genomes.yaml` — config-level support, in progress).
 
 ## Source
 

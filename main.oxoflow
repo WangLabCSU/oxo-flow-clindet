@@ -52,6 +52,23 @@ known_sites2 = "test/fixtures/refs/annotations/Mills_and_1000G_gold_standard.ind
 somatic_caller_list = ["HaplotypeCaller", "vardict", "varscan2", "muse", "Mutect2"]
 germ_caller_list = ["strelkamanta", "caveman"]
 
+# CNV branch (upstream somatic_cnv_list; mini-test default = [] -> off).
+# Set true to run the ported subset (freec/sequenza/exomedepth/ASCAT —
+# purple/amber/cobalt/facets need the upstream's custom containers, see
+# rules/80_cnv.oxoflow).
+cnv_enabled = false
+freec_ini_template = "scripts/config_exome.ini"
+freec_chr_len_file = "test/fixtures/cnv/freec_chrlen.txt"
+freec_chr_files = "test/fixtures/refs/sequence"
+freec_sambamba = "sambamba"
+sequenza_gc_wiggle = "test/fixtures/cnv/sequenza_gc.wig"
+ascat_loci_prefix = "test/fixtures/cnv/ascat_loci/"
+ascat_alleles_prefix = "test/fixtures/cnv/ascat_alleles/"
+ascat_gc_file = "test/fixtures/cnv/ascat_gc.txt"
+ascat_rt_file = ""
+ascat_chroms = "21"
+exomedepth_use_target_bed = true
+
 # vcf2maf / VEP (upstream: config['softwares_params'][genome_version]['vcf2maf'])
 ncbi_build = "GRCh38"
 vep_data = "resources/ref_genome/hg38/vep"
@@ -101,6 +118,9 @@ path = "rules/50_merge.oxoflow"
 [[include]]
 path = "rules/60_report.oxoflow"
 
+[[include]]
+path = "rules/80_cnv.oxoflow"
+
 # ---------------------------------------------------------------------------
 # Targets: merge_paired_vcf (upstream mini-test default stage call_mut_vcf,
 # ungated — no VEP needed) plus the VEP-gated `all` tail below (merged
@@ -114,6 +134,18 @@ expand_inputs = [
     { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf", variables = { pair_id = "config.pair_ids" } }
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all_vcf.done"]
+shell = "touch {output[0]}"
+
+[[rules]]
+name = "all_cnv"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/{pair_id}-T.bam_ratio.txt.png", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_segments.txt", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/exomedepth/{pair_id}/{pair_id}_exomedepth.tsv", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_purity.ploidy.tsv", variables = { pair_id = "config.pair_ids" } }
+]
+output = ["{config.output_dir}/{config.genome_version}/results/all_cnv.done"]
+when = "config.cnv_enabled"
 shell = "touch {output[0]}"
 
 [[rules]]
