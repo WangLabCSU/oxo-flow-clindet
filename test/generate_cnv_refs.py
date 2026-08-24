@@ -85,10 +85,12 @@ def main():
     ]
     (OUT / "exomedepth_regions.bed").write_text("\n".join(bed_lines) + "\n")
 
-    # freec chrLenFile (tab-separated chr<TAB>len, like a .fai without offsets)
-    (OUT / "freec_chrlen.txt").write_text(
-        "".join(f"{name}\t{len(s)}\n" for name, s in seqs.items())
-    )
+    # freec chrLenFile (tab-separated chr<TAB>len, like a .fai without offsets).
+    # Control-FREEC rejects contigs present here but absent from the capture
+    # regions (live: 'chromosome X present in your chrLenFile was not
+    # detected in your file with capture regions'), so only the captured
+    # chr21 contig is listed.
+    (OUT / "freec_chrlen.txt").write_text(f"{CHROM}\t{length}\n")
 
     # sequenza-style fixedStep wiggle, 50 bp windows on chr21 (same shape as
     # sequenza-utils gc_wiggle -w 50 output)
