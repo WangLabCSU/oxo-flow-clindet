@@ -114,7 +114,9 @@ input = {
 output = [ "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.grp" ]
 description = "gatk BaseRecalibrator on unpaired tumor (upstream recalibrate_base_qualities)"
 when = "config.recal_bqsr"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && [ -f {input.known_1}.tbi ] || gatk IndexFeatureFile -I {input.known_1}
+[ -f {input.known_2}.tbi ] || gatk IndexFeatureFile -I {input.known_2}
+gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
