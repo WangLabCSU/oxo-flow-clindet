@@ -104,7 +104,9 @@ on `vep_cache_ready` (see `[config]`). Deviations are documented in the
 | bam flagstat (T/N) | `bam_flagstat_tumor` / `bam_flagstat_normal` | samtools | identical command |
 | map_reads (T/N) | `map_reads_tumor` / `map_reads_normal` | bwa >=0.7.18, samtools | `bwa mem -MR` + `fixmate` + `sort` |
 | mark_duplicates (T/N) | `mark_duplicates_tumor` / `mark_duplicates_normal` | gatk4 4.6.2.0 (container) | `MarkDuplicates --CREATE_INDEX true`, `VALIDATION_STRINGENCY SILENT` |
-| recal_link (T/N) | `recal_link_tumor` / `recal_link_normal` | ln -s | BQSR off (upstream mini-test default) |
+| recal_link (T/N) | `recal_link_tumor` / `recal_link_normal` | ln -s | `when = "!config.recal_bqsr"` (upstream mini-test default `recal_BQSR: False`) |
+| recalibrate_base_qualities (T/N) | `recalibrate_base_qualities_tumor` / `recalibrate_base_qualities_normal` | gatk4 (container) | `BaseRecalibrator --use-original-qualities`, known-sites = upstream varanno KNOWN_SITES1/2; `when = "config.recal_bqsr"` |
+| apply_base_quality_recalibration (T/N) | `apply_base_quality_recalibration_tumor` / `apply_base_quality_recalibration_normal` | gatk4 (container) | `ApplyBQSR -use-original-qualities` + `samtools index`; `when = "config.recal_bqsr"` |
 | bed_to_interval_list | `bed_to_interval_list` | gatk4 (container) | `BedToIntervalList --SORT true` |
 | picard_collect_wes (T/N) | `picard_collect_wes_tumor` / `picard_collect_wes_normal` | gatk4 (container) | `CollectHsMetrics` |
 | call_variants_HaplotypeCaller | `call_variants_HaplotypeCaller` | gatk4 (container) | identical `-A` annotation flags |
@@ -130,11 +132,13 @@ on `vep_cache_ready` (see `[config]`). Deviations are documented in the
 | combined_multiqc | `prep_multiqc_data` + `combined_multiqc_prep_multiqc_data` + `combined_multiqc` | multiqc | conpair/purple inputs out of scope |
 
 **Not ported** (upstream branches outside the default paired WES path, with
-reasons): CNV branch (purple/amber/cobalt/ASCAT/FACETS/sequenza/freec/
-exomedepth — Broad-only, unbuildable without commercial licenses and heavy
-reference data), extended SV branch (delly/gridss/svaba/BRASS/linx/
-igv-caller/jasmine — reference-data heavy), RNA branch (arriba/TRUST4/
-isofox/RNA SNV — separate sample type), unpaired (single-sample) mode.
+reasons): CNV branch (purple/amber/cobalt need the upstream's custom
+hmftools container plus the multi-GB hmf_pipeline_resources tree;
+ASCAT/FACETS/sequenza/freec/exomedepth are ported or in progress), extended
+SV branch (delly/gridss/svaba/BRASS/linx/igv-caller/jasmine — gridss/BRASS/
+linx/igv-caller/jasmine require the upstream's custom containers and
+Sanger/HMF reference trees), WES unpaired (single-sample) mode (in
+progress; the RNA-side unpaired callers are ported in `main_rna.oxoflow`).
 
 ## Source
 

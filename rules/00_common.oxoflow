@@ -132,6 +132,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam.bai"
 }
 description = "symlink tumor dedup BAM to recal path when recal_BQSR=False"
+when = "!config.recal_bqsr"
 shell = """ln -s $(realpath {input.bam}) {output.bam}
 ln -s $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
@@ -148,10 +149,82 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam.bai"
 }
 description = "symlink normal dedup BAM to recal path when recal_BQSR=False"
+when = "!config.recal_bqsr"
 shell = """ln -s $(realpath {input.bam}) {output.bam}
 ln -s $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------ BQSR on (opt-in) ----
+# recal_BQSR = true: upstream recalibrate_base_qualities + apply_base_quality_
+# recalibration rules (workflow/common/rules/mapping.smk) run instead of the
+# symlink path. Known-sites = upstream varanno KNOWN_SITES1/2 (1000G phase1
+# snps + Mills gold-standard indels, hg38_chr21 mini set).
+[[rules]]
+name = "recalibrate_base_qualities_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-T.sorted.bam",
+    ref = "{config.reference}",
+    known_1 = "{config.known_sites1}",
+    known_2 = "{config.known_sites2}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.grp" ]
+description = "gatk BaseRecalibrator on tumor (upstream recalibrate_base_qualities)"
+when = "config.recal_bqsr"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "recalibrate_base_qualities_normal"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-NC.sorted.bam",
+    ref = "{config.reference}",
+    known_1 = "{config.known_sites1}",
+    known_2 = "{config.known_sites2}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.grp" ]
+description = "gatk BaseRecalibrator on normal (upstream recalibrate_base_qualities)"
+when = "config.recal_bqsr"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "apply_base_quality_recalibration_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-T.sorted.bam",
+    ref = "{config.reference}",
+    recal_table = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.grp"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam.bai"
+}
+description = "gatk ApplyBQSR + samtools index on tumor (upstream apply_base_quality_recalibration)"
+when = "config.recal_bqsr"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
+samtools index {output.bam}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
+
+[[rules]]
+name = "apply_base_quality_recalibration_normal"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-NC.sorted.bam",
+    ref = "{config.reference}",
+    recal_table = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.grp"
+}
+output = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam.bai"
+}
+description = "gatk ApplyBQSR + samtools index on normal (upstream apply_base_quality_recalibration)"
+when = "config.recal_bqsr"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
+samtools index {output.bam}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
 # -------------------------------------------------- picard hs metrics ----
 [[rules]]
