@@ -73,7 +73,8 @@ output = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{p
 resources = { threads = 30 }
 description = "bwa mem -MR + fixmate + sort for tumor (upstream map_reads)"
 shell = """[ -f {config.reference}.bwt ] || bwa index {config.reference} # the fixture kit ships the fasta only; build the index on first use # (live: fail to locate the index files)
-bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}"""
+bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}
+python3 scripts/patch_bam_contigs.py {output[0]} {output[0]}.hdr {config.reference}.fai && mv {output[0]}.hdr {output[0]} # add reference contigs missing from @SQ (chrX, from the RNA fusion fixture) — Manta rejects mismatched headers"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 
@@ -87,7 +88,8 @@ output = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{p
 resources = { threads = 30 }
 description = "bwa mem -MR + fixmate + sort for normal (upstream map_reads)"
 shell = """[ -f {config.reference}.bwt ] || bwa index {config.reference} # the fixture kit ships the fasta only; build the index on first use # (live: fail to locate the index files)
-bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_NC\\tPL:Illumia\\tSM:{pair_id}_NC\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}"""
+bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_NC\\tPL:Illumia\\tSM:{pair_id}_NC\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}
+python3 scripts/patch_bam_contigs.py {output[0]} {output[0]}.hdr {config.reference}.fai && mv {output[0]}.hdr {output[0]} # add reference contigs missing from @SQ (chrX, from the RNA fusion fixture) — Manta rejects mismatched headers"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 

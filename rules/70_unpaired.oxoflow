@@ -66,7 +66,8 @@ output = [ "{config.output_dir}/{config.genome_version}/results/mapped/unpaired/
 resources = { threads = 30 }
 description = "bwa mem -MR + fixmate + sort, unpaired path (upstream map_reads with sample_type=unpaired)"
 shell = """[ -f {config.reference}.bwt ] || bwa index {config.reference} # the fixture kit ships the fasta only; build the index on first use
-bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}"""
+bwa mem -t {effective_threads} -MR '@RG\\tID:{pair_id}_T\\tPL:Illumia\\tSM:{pair_id}_T\\tLB:DNA-Seq' {config.reference} {input.R1} {input.R2} | samtools fixmate -O bam - - | samtools sort -@ {effective_threads} -m 512M -O bam -o {output[0]}
+python3 scripts/patch_bam_contigs.py {output[0]} {output[0]}.hdr {config.reference}.fai && mv {output[0]}.hdr {output[0]} # add reference contigs missing from @SQ (chrX, from the RNA fusion fixture) — Manta rejects mismatched headers"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 
@@ -192,8 +193,11 @@ output = [
     "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/{pair_id}-Manta.log"
 ]
 description = "configManta.py tumor-only + runWorkflow (upstream unpaired_call_config_strelka; same bgzip/tabix + -m local hardening as the paired port)"
-shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
-[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+shell = """if [ ! -f {input.bed}.gz ] || [ ! -f {input.bed}.gz.tbi ] || [ {input.bed}.gz -nt {input.bed}.gz.tbi ]; then
+    rm -f {input.bed}.gz {input.bed}.gz.tbi
+    bgzip -k {input.bed} -o {input.bed}.gz
+    tabix -p bed {input.bed}.gz
+fi
 configManta.py --tumorBam {input.Tum} --runDir {config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Manta --exome --callRegions {input.bed}.gz --referenceFasta {input.ref}
 {config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Manta/runWorkflow.py -m local -j {effective_threads} -g 4
 touch {output[1]}"""
@@ -214,8 +218,11 @@ output = [
 ]
 resources = { threads = 8 }
 description = "configureStrelkaGermlineWorkflow on tumor-only (upstream unpaired_call_strelka_manta)"
-shell = """[ ! -f {input.bed}.gz ] && bgzip -k {input.bed} -o {input.bed}.gz
-[ ! -f {input.bed}.gz.tbi ] && tabix {input.bed}.gz
+shell = """if [ ! -f {input.bed}.gz ] || [ ! -f {input.bed}.gz.tbi ] || [ {input.bed}.gz -nt {input.bed}.gz.tbi ]; then
+    rm -f {input.bed}.gz {input.bed}.gz.tbi
+    bgzip -k {input.bed} -o {input.bed}.gz
+    tabix -p bed {input.bed}.gz
+fi
 configureStrelkaGermlineWorkflow.py --bam {input.Tum} --referenceFasta {input.ref} --indelCandidates {input.indelcd} --exome --runDir {config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Strelka --callRegions {input.bed}.gz
 {config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/Strelka/runWorkflow.py -m local -j {effective_threads} -g 4
 touch {output[1]}"""
