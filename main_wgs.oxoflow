@@ -143,6 +143,7 @@ shell = "touch {output[0]}"
 name = "all_sv"
 expand_inputs = [
     { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter_bnd.vcf", variables = { pair_id = "config.pair_ids" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_germ.vcf", variables = { pair_id = "config.pair_ids" } },
     { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.sv.vcf", variables = { pair_id = "config.pair_ids" } },
     { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/somaticSV.vcf.gz", variables = { pair_id = "config.pair_ids" } }
 ]

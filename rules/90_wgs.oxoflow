@@ -3,8 +3,9 @@
 # SV/{delly,svaba}.smk. telomerecat is marked "departed" upstream — not
 # ported.
 #
-# SV scope: delly (full 6-rule chain) + svaba (core run) + Manta SV (the
-# WGS Manta config rule in rules/91_wgs_callers.oxoflow emits somaticSV).
+# SV scope: delly (full 7-rule chain incl. germ) + svaba (core run) + Manta
+# SV (the WGS Manta config rule in rules/91_wgs_callers.oxoflow emits
+# somaticSV).
 # gridss/BRASS/linx/igcaller/jasmine require the upstream's custom
 # containers and Sanger/HMF reference trees (see README); the upstream
 # sansa-annotation and svaba svanno rules gate on a sansa config that is
@@ -81,8 +82,14 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}.bcf" ]
 resources = { threads = 4 }
-description = "delly sr structural variant call (upstream WGS SV_delly)"
-shell = """delly sr -g {config.reference} -q 20 -s 15 -o {output[0]} {input.Tum} {input.NC}"""
+# Upstream runs `delly sr` inside its custom dellytools/delly container
+# (resources/containers/delly_v2.3.1.sif); the port substitutes the
+# portable depot bioconda delly 1.7.2, whose CLI renamed the `sr`
+# subcommand to `call` (live: "Unrecognized command sr"). Flags are
+# identical — upstream's own SV_delly_germ rule uses `delly call -q ... -s
+# ...` — so this is a one-word translation, same semantics.
+description = "delly call structural variant discovery (upstream WGS SV_delly, sr -> call for depot delly 1.7.2)"
+shell = """delly call -g {config.reference} -q 20 -s 15 -o {output[0]} {input.Tum} {input.NC}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h4d20210_0"
 
@@ -120,6 +127,18 @@ shell = """bcftools index -f {input[0]}
 bcftools view -f PASS -O v -o {output[0]} {input[0]}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "SV_delly_germ"
+input = {
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_germ.vcf" ]
+resources = { threads = 4 }
+description = "delly germline call on the normal bam (upstream SV_delly_germ)"
+shell = """delly call -g {config.reference} {input.NC} -q 10 -s 15 -n > {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h4d20210_0"
 
 [[rules]]
 name = "delly_filter"
