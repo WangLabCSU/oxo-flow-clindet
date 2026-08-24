@@ -11,10 +11,15 @@ output_tsv <- getAbsolutePath(output_tsv)
 
 load(input_rdata)
 
-pp_df <- data.frame(
-    ploidy = ascat.output[['ploidy']],
-    purity = ascat.output[['purity']],
-    goodnessOfFit = ascat.output[['goodnessOfFit']]
-)
+if (is.null(ascat.bc)) {
+    # mini-fixture fallback rdata (documented in ascat.R): no ASCAT result
+    pp_df <- data.frame(ploidy = NA, purity = NA, goodnessOfFit = NA)
+} else {
+    pp_df <- data.frame(
+        ploidy = ascat.output[['ploidy']],
+        purity = ascat.output[['purity']],
+        goodnessOfFit = ascat.output[['goodnessOfFit']]
+    )
+}
 
 write.table(pp_df, file = output_tsv, row.names=FALSE, sep="\t",quote=FALSE)

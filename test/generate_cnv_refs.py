@@ -99,11 +99,12 @@ def main():
     # chr21 contig is listed.
     (OUT / "freec_chrlen.txt").write_text(f"{CHROM}\t{length}\n")
 
-    # sequenza-style fixedStep wiggle, 50 bp windows on chr21 (same shape as
-    # sequenza-utils gc_wiggle -w 50 output)
-    wig = [f"fixedStep chrom={CHROM} start=1 step=50 span=50"]
+    # sequenza-style variableStep wiggle, 50 bp windows on chr21 (the
+    # sequenza-utils gc reader expects position<TAB>value lines — a
+    # fixedStep value-only wig raises 'not enough values to unpack')
+    wig = [f"variableStep chrom={CHROM} span=50"]
     for start in range(1, length + 1, 50):
-        wig.append(str(gc_window(seq, start, 50)))
+        wig.append(f"{start}\t{gc_window(seq, start, 50)}")
     (OUT / "sequenza_gc.wig").write_text("\n".join(wig) + "\n")
 
     print(f"wrote {len(positions)} loci for a {length} bp {CHROM} contig "
