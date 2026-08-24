@@ -135,8 +135,12 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_germ.vcf" ]
 resources = { threads = 4 }
-description = "delly germline call on the normal bam (upstream SV_delly_germ)"
-shell = """delly call -g {config.reference} {input.NC} -q 10 -s 15 -n > {output[0]}"""
+# Upstream passes a bare `-n`; in the port's depot delly 1.7.2 `-n` is
+# --maxreadsep and REQUIRES an argument (live: boost::program_options
+# "the required argument for option '--maxreadsep' is missing").
+# 1000000 is delly's documented default, preserving upstream's intent.
+description = "delly germline call on the normal bam (upstream SV_delly_germ; bare -n -> -n 1000000 for depot delly 1.7.2)"
+shell = """delly call -g {config.reference} {input.NC} -q 10 -s 15 -n 1000000 > {output[0]}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h4d20210_0"
 
