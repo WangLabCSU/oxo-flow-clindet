@@ -133,7 +133,7 @@ name = "CNA_exomedepth"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
-    bed = "{config.target_bed}",
+    bed = "{config.exomedepth_bed}",
     ref = "{config.reference}"
 }
 output = {

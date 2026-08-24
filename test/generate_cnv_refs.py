@@ -75,6 +75,16 @@ def main():
     (OUT / "ascat_alleles" / "21").write_text("\n".join(alleles_lines) + "\n")
     (OUT / "ascat_gc.txt").write_text("\n".join(gc_lines) + "\n")
 
+    # exomedepth regions bed: the 2-region exome bed is degenerate for
+    # ExomeDepth's reference-set logic (somatic.CNV.call errors with <3
+    # targets); 10 synthetic regions across the chr21 contig make the
+    # mini test mechanically valid
+    bed_lines = [
+        f"{CHROM}\t{start}\t{start + 50}"
+        for start in range(50, length - 60, 80)
+    ]
+    (OUT / "exomedepth_regions.bed").write_text("\n".join(bed_lines) + "\n")
+
     # freec chrLenFile (tab-separated chr<TAB>len, like a .fai without offsets)
     (OUT / "freec_chrlen.txt").write_text(
         "".join(f"{name}\t{len(s)}\n" for name, s in seqs.items())

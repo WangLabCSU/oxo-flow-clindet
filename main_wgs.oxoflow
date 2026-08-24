@@ -76,6 +76,7 @@ ascat_gc_file = "test/fixtures/cnv/ascat_gc.txt"
 ascat_rt_file = ""
 ascat_chroms = "21"
 exomedepth_use_target_bed = true
+exomedepth_bed = "test/fixtures/cnv/exomedepth_regions.bed"
 
 # vcf2maf / VEP (upstream: config['softwares_params'][genome_version]['vcf2maf'])
 ncbi_build = "GRCh38"

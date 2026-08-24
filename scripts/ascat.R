@@ -27,9 +27,10 @@ loci.prefix <- snakemake@params[['lociprefix']]
 GCcontentfile <- snakemake@params[['GCcontentfile']]
 rp_file <- snakemake@params[['replictimingfile']]
 
-## getAbsolutePath
-alleles.prefix <- getAbsolutePath(alleles.prefix)
-loci.prefix <- getAbsolutePath(loci.prefix)
+## getAbsolutePath (note: R.utils::getAbsolutePath strips trailing
+## slashes — restore them so paste0(prefix, chrom) joins correctly)
+alleles.prefix <- paste0(getAbsolutePath(alleles.prefix), "/")
+loci.prefix <- paste0(getAbsolutePath(loci.prefix), "/")
 GCcontentfile <- getAbsolutePath(GCcontentfile)
 rp_file <- getAbsolutePath(rp_file)
 
