@@ -60,7 +60,7 @@ germ_caller_list = ["strelkamanta", "caveman"]
 # purple/amber/cobalt/facets need the upstream's custom containers, see
 # rules/80_cnv.oxoflow).
 cnv_enabled = false
-freec_ini_template = "scripts/config_exome.ini"
+freec_ini_template = "scripts/config_exome.mini.ini"
 freec_chr_len_file = "test/fixtures/cnv/freec_chrlen.txt"
 freec_chr_files = "test/fixtures/cnv/freec_chr_fasta"
 freec_sambamba = "sambamba"
