@@ -69,7 +69,18 @@ if (use_target_bed) {
 #         include.chr = F)
 
 my.counts.df <- as.data.frame(my.counts)
-colnames(my.counts.df) <- c('chromosome','start','end','exon','GC','tumor','normal')
+# Version adaptation (documented): the upstream-era ExomeDepth returns
+# 7 columns (chromosome/start/end/exon/GC/counts...); the installed
+# r-exomedepth drops the 'exon' name column (6 columns). Fill it with
+# row indices when absent.
+if (ncol(my.counts.df) == 7) {
+    colnames(my.counts.df) <- c('chromosome','start','end','exon','GC','tumor','normal')
+} else if (ncol(my.counts.df) == 6) {
+    colnames(my.counts.df) <- c('chromosome','start','end','GC','tumor','normal')
+    my.counts.df$exon <- paste0('exon_', seq_len(nrow(my.counts.df)))
+} else {
+    stop('unexpected getBamCounts column count: ', ncol(my.counts.df))
+}
 
 # Mini-fixture accommodation (documented): the synthetic mini bed on the
 # 900 bp chr21 reference can fail ExomeDepth's reference-set logic

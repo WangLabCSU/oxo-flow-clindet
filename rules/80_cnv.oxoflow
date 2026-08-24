@@ -56,7 +56,7 @@ output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec
 resources = { threads = 10 }
 description = "write per-sample Control-FREEC config (upstream freec_config + config_freec.py; threads = upstream rule threads, sets SambambaThreads)"
 when = "config.cnv_enabled"
-shell = """python3 scripts/smk.py --script scripts/config_freec.py --input Tum {input.Tum} --input NC {input.NC} --input ini_template {input.ini_template} --param chrLenFile {config.freec_chr_len_file} --param chrFiles {config.freec_chr_files} --param bed {config.target_bed} --param sambamba {config.freec_sambamba} --param maxThreads 6 --param ref {config.reference} --output config {output[0]} --threads {threads}"""
+shell = """python3 scripts/smk.py --script scripts/config_freec.py --input Tum {input.Tum} --input NC {input.NC} --input ini_template {input.ini_template} --param chrLenFile {config.freec_chr_len_file} --param chrFiles {config.freec_chr_files} --param bed {config.target_bed} --param sambamba {config.freec_sambamba} --param maxThreads 6 --param outputDir {config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id} --param ref {config.reference} --output config {output[0]} --threads {threads}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 
