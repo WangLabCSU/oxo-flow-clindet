@@ -38,9 +38,14 @@ target.df <- read.delim(target.file, header = FALSE)
 use_target_bed <- isTRUE(snakemake@params[['use_target_bed']])
 if (use_target_bed) {
     colnames(target.df) <- c('chromosome', 'start', 'end')[seq_len(ncol(target.df))]
+    # strip the chr prefix and let include.chr=TRUE re-add it — the upstream
+    # hg38 branch (exons.hg19 + include.chr=T) expects that 7-column shape
+    # (colnames<- below); include.chr=FALSE returns a 6-column frame that
+    # breaks the upstream colnames assignment
+    target.df$chromosome <- sub('^chr', '', target.df$chromosome)
     my.counts <- getBamCounts(bed.frame = target.df,
             bam.files = bam.files,
-            include.chr = FALSE,  # the target BED already carries chr-prefixed names
+            include.chr = TRUE,
             referenceFasta = reference.file)
 
 } else if(genome_version == 'b37'){

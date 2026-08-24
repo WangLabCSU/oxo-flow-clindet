@@ -71,8 +71,8 @@ def main():
         alleles_lines.append(f"{CHROM}\t{pos}\t{rsid}\t{ref_base}\t{alt}")
         gc_lines.append(f"{CHROM}\t{pos}\t0.50")
 
-    (OUT / "ascat_loci" / "21").write_text("\n".join(loci_lines) + "\n")
-    (OUT / "ascat_alleles" / "21").write_text("\n".join(alleles_lines) + "\n")
+    (OUT / "ascat_loci" / "21.txt").write_text("\n".join(loci_lines) + "\n")
+    (OUT / "ascat_alleles" / "21.txt").write_text("\n".join(alleles_lines) + "\n")
     (OUT / "ascat_gc.txt").write_text("\n".join(gc_lines) + "\n")
 
     # exomedepth regions bed: the 2-region exome bed is degenerate for
