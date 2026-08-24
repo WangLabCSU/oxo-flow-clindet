@@ -84,7 +84,7 @@ resources = { threads = 4 }
 description = "delly sr structural variant call (upstream WGS SV_delly)"
 shell = """delly sr -g {config.reference} -q 20 -s 15 -o {output[0]} {input.Tum} {input.NC}"""
 [rules.environment]
-singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h241dc84_0"
+singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h4d20210_0"
 
 [[rules]]
 name = "SV_delly_sample_tsv"
@@ -109,7 +109,7 @@ output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/
 description = "delly filter -p -f somatic -a 0.05 (upstream SV_delly_filter_somatic)"
 shell = """delly filter -p -f somatic -a 0.05 -s {input.samples} -o {output[0]} {input.bcf}"""
 [rules.environment]
-singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h241dc84_0"
+singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h4d20210_0"
 
 [[rules]]
 name = "SV_delly_to_vcf"
@@ -156,4 +156,6 @@ resources = { threads = 10 }
 description = "svaba run tumor/normal (upstream WGS SV_svaba)"
 shell = """svaba run -t {input.Tum} -n {input.NC} -p {threads} -D {input.dbsnp_indel} -a {config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id} -G {config.reference}"""
 [rules.environment]
-singularity = "https://depot.galaxyproject.org/singularity/svaba%3A1.1.3--he5d4974_1"
+# upstream runs svaba in its custom svaba.sif; the port pins the bioconda
+# 1.2.0 image (verified present on depot.galaxyproject.org)
+singularity = "https://depot.galaxyproject.org/singularity/svaba%3A1.2.0--h69ac913_1"
