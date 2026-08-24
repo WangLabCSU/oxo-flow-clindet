@@ -5,8 +5,6 @@
 # standard sequenza call step (sequenza.extract -> fit -> results, the same
 # three-step API the upstream intended), writing the same
 # {sample}_segments.txt output the upstream wrapper targets.
-library(sequenza)
-
 # Version-compat shim (live-verified on tx-ubuntu, r-sequenza 3.0.0 +
 # iotools 0.3.5): sequenza's gc.sample.stats calls
 #   chunk.apply(input=..., FUN=..., CH.MAX.SIZE=..., parallel = <n>)
@@ -14,13 +12,16 @@ library(sequenza)
 # argument is named CH.PARALLEL. The stray `parallel` therefore lands in
 # iotools' `...` and is forwarded into the chunk FUN, killing the run with
 # "unused argument (parallel = N)". No fixed r-sequenza exists (CRAN latest
-# is 3.0.0), so this shim installs a chunk.apply override directly into
-# sequenza's namespace via assignInNamespace. (A plain global definition
-# does NOT shadow: sequenza NAMESPACE has importFrom(iotools, chunk.apply),
-# so the binding sits in imports:sequenza, ahead of the global environment
-# in the lookup chain — also live-verified.) Real-data runs take this
-# identical path — it is a version bug, not a mini-fixture accommodation.
-original_chunk_apply <- iotools::chunk.apply
+# is 3.0.0), so the shim replaces chunk.apply inside namespace:iotools —
+# installed here, BEFORE library(sequenza), so sequenza's
+# importFrom(iotools, chunk.apply) binding resolves to the shim under both
+# lazy and copy import semantics. (Both simpler routes were live-tested and
+# fail: a plain global definition never shadows the imports:sequenza
+# binding, and assignInNamespace(ns="sequenza") errors because sequenza's
+# own namespace has no such binding — "no binding for chunk.apply".)
+# Real-data runs take this identical path — it is a version bug, not a
+# mini-fixture accommodation.
+original_chunk_apply <- getExportedValue("iotools", "chunk.apply")
 assignInNamespace(
     "chunk.apply",
     function(input, FUN, ..., parallel = NULL) {
@@ -38,8 +39,10 @@ assignInNamespace(
         }
         do.call(original_chunk_apply, args)
     },
-    ns = "sequenza"
+    ns = "iotools"
 )
+
+library(sequenza)
 
 bin_seqz <- snakemake@input[['bin_seqz']]
 out_segment <- snakemake@output[['segment']]
