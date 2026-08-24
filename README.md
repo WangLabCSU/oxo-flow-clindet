@@ -135,6 +135,24 @@ oxo-flow dry-run main_wgs.oxoflow
 oxo-flow run main_wgs.oxoflow -j 8
 ```
 
+## Non-human genomes (config parity)
+
+Upstream ships `workflow/config/conf/genomes.yaml` entries for worm
+(`WBcel235`) and mouse (`mm10`) in addition to `b37`/`hg38` — the rules are
+species-agnostic (same mapping/calling chain, different reference files),
+so any upstream genome works by overriding the `[config]` reference keys:
+
+| Upstream genomes.yaml key | WBcel235 (worm) | mm10 (mouse) |
+|---|---|---|
+| `REFFA` | `WBcel235_genome.fa` | `Sanger/core_ref_mm10/genome.fa` |
+| `GTF` | `Caenorhabditis_elegans.WBcel235.114.gtf` | *(empty upstream)* |
+| `DBSNP` / `DBSNP_INDEL` / `MUTECT2_VCF` | worm fake-dbsnp VCFs | *(mostly empty upstream)* |
+
+e.g. `oxo-flow run main.oxoflow --arg reference=…/WBcel235_genome.fa --arg
+target_bed=… --arg dbsnp=…` (the paired WES chain is what upstream runs for
+these genomes; the exome bed is the genome's capture). The mini fixture kit
+does not ship non-human references.
+
 ## Fidelity
 
 | Upstream process/rule | oxo-flow rule | Tool (version) | Notes |
@@ -198,8 +216,8 @@ oxo-flow run main_wgs.oxoflow -j 8
   and WGS Battenberg/ecDNA/VirusScan: custom containers + resource trees
   as above.
 - conpair contamination check: custom conpair_latest.sif container.
-- non-human genomes (WBcel235/mm10 entries in the upstream `genomes.yaml`):
-  config-level support — in progress.
+- non-human genomes: supported at config level (WBcel235/mm10 parity table
+  above) — the upstream rule set itself is species-agnostic.
 
 ## Source
 
