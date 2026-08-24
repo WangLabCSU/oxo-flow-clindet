@@ -31,3 +31,6 @@ dependencies:
   - pip
   - ca-certificates
   - bioconductor-tximport
+  # upstream env lacks cyvcf2 although its delly2bnd rule (WGS SV, conda
+  # clindet_main) imports it — upstream bug, fixed here
+  - cyvcf2

@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OXO=${OXO:-oxo-flow}
 
-for WF in main.oxoflow main_unpaired.oxoflow; do
+for WF in main.oxoflow main_unpaired.oxoflow main_wgs.oxoflow; do
   echo "==> [$WF] validate"
   "$OXO" validate "$WF"
 

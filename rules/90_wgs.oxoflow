@@ -1,0 +1,159 @@
+# WGS-specific rules, ported from upstream workflow/WGS/rules/mapping.smk
+# (picard_collect_wgs, picard_flength_wgs) and workflow/WGS/rules/rtm/paired/
+# SV/{delly,svaba}.smk. telomerecat is marked "departed" upstream — not
+# ported.
+#
+# SV scope: delly (full 6-rule chain) + svaba (core run) + Manta SV (the
+# WGS Manta config rule in rules/91_wgs_callers.oxoflow emits somaticSV).
+# gridss/BRASS/linx/igcaller/jasmine require the upstream's custom
+# containers and Sanger/HMF reference trees (see README); the upstream
+# sansa-annotation and svaba svanno rules gate on a sansa config that is
+# absent from the mini test — not ported.
+
+[workflow]
+name = "wgs"
+
+# --------------------------------------------------- WGS metrics ----
+[[rules]]
+name = "picard_collect_wgs_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    ref = "{config.reference}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T.txt" ]
+resources = { memory_mb = 1024 }
+description = "picard CollectWgsMetrics tumor (upstream WGS picard_collect_wgs)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "picard_collect_wgs_normal"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    ref = "{config.reference}"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC.txt" ]
+resources = { memory_mb = 1024 }
+description = "picard CollectWgsMetrics normal (upstream WGS picard_collect_wgs)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "picard_flength_wgs_tumor"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    ref = "{config.reference}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.txt",
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.pdf"
+]
+resources = { memory_mb = 1024 }
+description = "picard CollectInsertSizeMetrics tumor (upstream WGS picard_flength_wgs)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "picard_flength_wgs_normal"
+input = {
+    bam = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    ref = "{config.reference}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.txt",
+    "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.pdf"
+]
+resources = { memory_mb = 1024 }
+description = "picard CollectInsertSizeMetrics normal (upstream WGS picard_flength_wgs)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------------ delly ----
+[[rules]]
+name = "SV_delly"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}.bcf" ]
+resources = { threads = 4 }
+description = "delly sr structural variant call (upstream WGS SV_delly)"
+shell = """delly sr -g {config.reference} -q 20 -s 15 -o {output[0]} {input.Tum} {input.NC}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h241dc84_0"
+
+[[rules]]
+name = "SV_delly_sample_tsv"
+input = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}.bcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}.samples.tsv" ]
+description = "write tumor/control sample map (upstream SV_delly_sample_tsv)"
+shell = """bcftools query -l {input[0]} > {output[0]}.samples
+awk 'NR==1{{print $1"\\ttumor"}}
+     NR==2{{print $1"\\tcontrol"}}' \\
+     {output[0]}.samples > {output[0]}
+rm -f {output[0]}.samples"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "SV_delly_filter_somatic"
+input = {
+    bcf = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}.bcf",
+    samples = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}.samples.tsv"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_somatic.bcf" ]
+description = "delly filter -p -f somatic -a 0.05 (upstream SV_delly_filter_somatic)"
+shell = """delly filter -p -f somatic -a 0.05 -s {input.samples} -o {output[0]} {input.bcf}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/delly%3A1.7.2--h241dc84_0"
+
+[[rules]]
+name = "SV_delly_to_vcf"
+input = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_somatic.bcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_somatic.vcf" ]
+description = "bcftools index + view PASS (upstream SV_delly_to_vcf)"
+shell = """bcftools index -f {input[0]}
+bcftools view -f PASS -O v -o {output[0]} {input[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "delly_filter"
+input = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_somatic.vcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter.vcf" ]
+description = "bcftools filter PASS (upstream WGS delly_filter)"
+shell = """bcftools filter -i 'FILTER="PASS"' {input[0]} > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+[[rules]]
+name = "delly2bnd"
+input = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter.vcf" ]
+output = [ "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter_bnd.vcf" ]
+description = "convert delly VCF to BND notation (upstream delly2bnd + delly2bnd.py)"
+shell = """python3 scripts/delly2bnd.py -v {input[0]} -r {config.reference} -o {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# ------------------------------------------------------------ svaba ----
+[[rules]]
+name = "SV_svaba"
+input = {
+    Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
+    NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
+    dbsnp_indel = "{config.dbsnp_indel}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.sv.vcf",
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.indel.vcf",
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.unfiltered.somatic.sv.vcf"
+]
+resources = { threads = 10 }
+description = "svaba run tumor/normal (upstream WGS SV_svaba)"
+shell = """svaba run -t {input.Tum} -n {input.NC} -p {threads} -D {input.dbsnp_indel} -a {config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id} -G {config.reference}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/svaba%3A1.1.3--he5d4974_1"

@@ -116,6 +116,25 @@ oxo-flow dry-run main_unpaired.oxoflow   # 21 run / 11 skip under default config
 oxo-flow run main_unpaired.oxoflow -j 8
 ```
 
+## WGS sub-workflow
+
+`main_wgs.oxoflow` ports the upstream **workflow/WGS** run type
+(`wrapper/wgs.smk`): the shared mapping/dedup/recal chain and the
+vcf_norm/vcf2maf/merge/flag/report/CNV tail, plus the WGS-specific
+`rules/91_wgs_callers.oxoflow` (callers without exome restrictions —
+no `--intervals`/`--callRegions`/`--exome`, Manta emits `somaticSV`,
+germline Strelka takes both bams, vardict regions generated from the
+`.fai`) and `rules/90_wgs.oxoflow` (CollectWgsMetrics/
+CollectInsertSizeMetrics + delly/svaba SV chains; Manta SV comes from the
+WGS Manta config rule). Upstream has no WGS mini-test config, so the
+fixture run is an honest pseudo-WGS smoke test on the chr21 fixture
+reference (see the workflow header).
+
+```bash
+oxo-flow dry-run main_wgs.oxoflow
+oxo-flow run main_wgs.oxoflow -j 8
+```
+
 ## Fidelity
 
 | Upstream process/rule | oxo-flow rule | Tool (version) | Notes |
@@ -155,17 +174,32 @@ oxo-flow run main_unpaired.oxoflow -j 8
 | sequenza bam2seqz/binning/call | `sequenza_bam2seqz` / `sequenza_seqz_binning` / `sequenza_call` | sequenza-utils, r-sequenza | upstream's referenced `scripts/sequenza.R` does not exist in the tree — port ships the standard extract→fit→results chain (`scripts/sequenza_call.R`) |
 | CNA_exomedepth | `CNA_exomedepth` | ExomeDepth (Bioc) | verbatim `ExomeDepth.R`; upstream counts over hardcoded exons.hg19 (dead `target.file` read) — port keeps that and adds a documented `use_target_bed` switch for the mini fixture |
 | CNA_ASCAT / ASCAT_EXTRACT_PURITYPLOIDY | `CNA_ASCAT` / `ASCAT_EXTRACT_PURITYPLOIDY` | ASCAT >=3.2, alleleCounter | verbatim `ASCAT.R` (+chroms/GC/rt from config — upstream hardcodes c(1:22)); `ascat_pp.R` verbatim |
+| WGS mapping/recal/QC | shared `00_common` rules | bwa/gatk4/picard | upstream WGS map_reads/markdup/BQSR/recal_link are identical to WES |
+| WGS callers (no exome restrictions) | `rules/91_wgs_callers.oxoflow` | gatk4/muse/varscan/vardict/strelka2/manta | no `--intervals`/`--callRegions`/`--exome`; Manta emits somaticSV; germline Strelka takes BOTH bams (WES: normal only); vardict regions from `vardict_wgs_bed` |
+| WGS picard_collect_wgs / picard_flength_wgs | `picard_collect_wgs_{tumor,normal}` / `picard_flength_wgs_{tumor,normal}` | picard | CollectWgsMetrics + CollectInsertSizeMetrics (telomerecat is "departed" upstream — not ported) |
+| SV_delly chain | `SV_delly` → `SV_delly_sample_tsv` → `SV_delly_filter_somatic` → `SV_delly_to_vcf` → `delly_filter` → `delly2bnd` | delly 1.7.2 (container), bcftools | verbatim; `delly2bnd.py` verbatim (upstream env lacks cyvcf2 — added to envs/clindet.yaml, upstream bug) |
+| SV_svaba | `SV_svaba` | svaba (container) | verbatim run; sansa/svanno annotation gates absent from the mini config — not ported |
+| Manta SV | `call_config_strelka` (WGS) | manta | `somaticSV.vcf.gz` from the WGS Manta run (upstream SV list entry 'Manta') |
 
-**Not ported** (upstream branches outside the default paired WES path, with
-reasons): CNV purple/amber/cobalt (HMF — the upstream's custom hmftools
-container plus the multi-GB hmf_pipeline_resources tree; dryclean has no
-rule file upstream) and FACETS/facets-suite (custom facets-suite-dev.img,
-requires compiling cnv_facets C++); extended SV branch
-(delly/gridss/svaba/BRASS/linx/igv-caller/jasmine — gridss/BRASS/linx/
-igv-caller/jasmine require the upstream's custom containers and Sanger/HMF
-reference trees), WGS run type (mapping/SNV/CNV/SV for whole-genome
-inputs — in progress), non-human genomes (WBcel235/mm10 entries in the
-upstream `genomes.yaml` — config-level support, in progress).
+**Not ported** (upstream branches with reasons):
+- CNV purple/amber/cobalt: HMF tools run in the upstream's custom
+  hmftools.sif with the multi-GB hmf_pipeline_resources tree (built
+  locally upstream, `pull_zenodo` run type) — not a portable image;
+  dryclean has no rule file upstream (list-only).
+- CNV FACETS/facets-suite: custom facets-suite-dev.img + snp-pileup PoN
+  chain, requires compiling cnv_facets C++.
+- CNV CNA_ABSOLUTE_GISTIC / ASCAT_GISTIC: ABSOLUTE + GISTIC2 are Broad
+  tools without conda packages; SM_check / CNA_Battenberg are marked
+  "for future development" upstream (Battenberg needs cgpbattenberg371.sif
+  + 1000G impute reference data).
+- SV gridss/BRASS/linx/igv-caller/jasmine: custom containers (gridss2/
+  brass634/jasminesv sifs) + Sanger VAGrENT/BRASS and HMF resource trees.
+- WGS unpaired callers (sage/deepvariant/pindel/octopus/UnifiedGeniTyper)
+  and WGS Battenberg/ecDNA/VirusScan: custom containers + resource trees
+  as above.
+- conpair contamination check: custom conpair_latest.sif container.
+- non-human genomes (WBcel235/mm10 entries in the upstream `genomes.yaml`):
+  config-level support — in progress.
 
 ## Source
 
