@@ -85,6 +85,13 @@ def main():
     ]
     (OUT / "exomedepth_regions.bed").write_text("\n".join(bed_lines) + "\n")
 
+    # freec chrFiles: Control-FREEC wants a DIRECTORY of per-chromosome
+    # fastas (<chr>.fa), not a multi-contig file
+    chr_dir = OUT / "freec_chr_fasta"
+    chr_dir.mkdir(exist_ok=True)
+    for name, seq in seqs.items():
+        (chr_dir / f"{name}.fa").write_text(f">{name}\n{seq}\n")
+
     # freec chrLenFile (tab-separated chr<TAB>len, like a .fai without offsets).
     # Control-FREEC rejects contigs present here but absent from the capture
     # regions (live: 'chromosome X present in your chrLenFile was not
