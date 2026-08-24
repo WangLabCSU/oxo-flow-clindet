@@ -233,7 +233,8 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 name = "bed_to_interval_list"
 input = { bed = "{config.target_bed}", dict = "{config.reference_dict}" }
 output = [ "{config.output_dir}/{config.genome_version}/picard/{pair_id}.interval_list" ]
-description = "gatk BedToIntervalList for CollectHsMetrics"
+description = "gatk BedToIntervalList for CollectHsMetrics (WES only — WGS runs CollectWgsMetrics instead)"
+when = "!config.wgs_mode"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk BedToIntervalList --INPUT {input.bed} --SEQUENCE_DICTIONARY {input.dict} --SORT true --OUTPUT {output[0]}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
@@ -246,7 +247,8 @@ input = {
     intervals = "{config.output_dir}/{config.genome_version}/picard/{pair_id}.interval_list"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wes_metrics/{pair_id}-T.txt" ]
-description = "gatk CollectHsMetrics on tumor (upstream picard_collect_wes)"
+description = "gatk CollectHsMetrics on tumor (upstream picard_collect_wes; WES only — WGS runs CollectWgsMetrics)"
+when = "!config.wgs_mode"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectHsMetrics --INPUT {input.bam} --OUTPUT {output[0]} --REFERENCE_SEQUENCE {input.reference} --BAIT_INTERVALS {input.intervals} --TARGET_INTERVALS {input.intervals}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
@@ -259,7 +261,8 @@ input = {
     intervals = "{config.output_dir}/{config.genome_version}/picard/{pair_id}.interval_list"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wes_metrics/{pair_id}-NC.txt" ]
-description = "gatk CollectHsMetrics on normal (upstream picard_collect_wes)"
+description = "gatk CollectHsMetrics on normal (upstream picard_collect_wes; WES only — WGS runs CollectWgsMetrics)"
+when = "!config.wgs_mode"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectHsMetrics --INPUT {input.bam} --OUTPUT {output[0]} --REFERENCE_SEQUENCE {input.reference} --BAIT_INTERVALS {input.intervals} --TARGET_INTERVALS {input.intervals}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"

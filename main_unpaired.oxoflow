@@ -29,6 +29,8 @@ format_version = "1.0"
 [config]
 output_dir = "mini_test"
 genome_version = "hg38_chr21"
+# run-type switch (shared rules gate on !config.wgs_mode; unpaired is WES)
+wgs_mode = false
 
 # Reads (upstream samplesheet Tumor_R1_file_path / Tumor_R2_file_path; the
 # normal columns are ignored in this workflow)
@@ -45,8 +47,8 @@ mutect2_germline_vcf = "test/fixtures/refs/annotations/gnomAD.r2.1.1.GRCh38.PASS
 
 # BQSR (upstream recal_BQSR, mini-test default False -> recal_link symlinks)
 recal_bqsr = false
-known_sites1 = "test/fixtures/refs/annotations/1000G_phase1.snps.high_confidence.hg38_chr21.vcf.gz"
-known_sites2 = "test/fixtures/refs/annotations/Mills_and_1000G_gold_standard.indels.hg38_chr21.vcf.gz"
+known_sites1 = "test/fixtures/refs/annotations/known_sites1.mini.vcf.gz"
+known_sites2 = "test/fixtures/refs/annotations/known_sites2.mini.vcf.gz"
 
 # Tumor-only caller list (upstream run_params.tumor_only_caller; see header)
 unpaired_caller_list = ["Mutect2", "HaplotypeCaller", "varscan2", "strelka", "vardict", "lofreq", "freebayes"]

@@ -122,7 +122,10 @@ def main():
     sys.modules["snakemake"] = mod
     with open(script) as fh:
         code = compile(fh.read(), script, "exec")
-        exec(code, {"__name__": "__main__", "__file__": script})
+        # Upstream scripts reference the bare `snakemake` global (injected
+        # by `snakemake.script` at runtime — they never import it), so the
+        # module is passed in the exec globals too.
+        exec(code, {"__name__": "__main__", "__file__": script, "snakemake": mod})
 
 
 if __name__ == "__main__":
