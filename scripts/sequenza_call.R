@@ -14,27 +14,32 @@ library(sequenza)
 # argument is named CH.PARALLEL. The stray `parallel` therefore lands in
 # iotools' `...` and is forwarded into the chunk FUN, killing the run with
 # "unused argument (parallel = N)". No fixed r-sequenza exists (CRAN latest
-# is 3.0.0), so this shim shadows chunk.apply in the script's global
-# environment (sequenza has no importFrom binding for it, so the global
-# definition wins) and translates `parallel` to the installed iotools'
-# argument name. Real-data runs take this identical path — it is a version
-# bug, not a mini-fixture accommodation.
-chunk.apply <- function(input, FUN, ..., parallel = NULL) {
-    f <- iotools::chunk.apply
-    args <- c(list(input = input, FUN = FUN), list(...))
-    if (!is.null(parallel)) {
-        nms <- names(formals(f))
-        if ("parallel" %in% nms) {
-            args$parallel <- parallel
-        } else if ("CH.PARALLEL" %in% nms) {
-            args$CH.PARALLEL <- parallel
-        } else {
-            stop("iotools::chunk.apply supports neither `parallel` nor ",
-                 "`CH.PARALLEL`; cannot forward the parallelism argument")
+# is 3.0.0), so this shim installs a chunk.apply override directly into
+# sequenza's namespace via assignInNamespace. (A plain global definition
+# does NOT shadow: sequenza NAMESPACE has importFrom(iotools, chunk.apply),
+# so the binding sits in imports:sequenza, ahead of the global environment
+# in the lookup chain — also live-verified.) Real-data runs take this
+# identical path — it is a version bug, not a mini-fixture accommodation.
+original_chunk_apply <- iotools::chunk.apply
+assignInNamespace(
+    "chunk.apply",
+    function(input, FUN, ..., parallel = NULL) {
+        args <- c(list(input = input, FUN = FUN), list(...))
+        if (!is.null(parallel)) {
+            nms <- names(formals(original_chunk_apply))
+            if ("parallel" %in% nms) {
+                args$parallel <- parallel
+            } else if ("CH.PARALLEL" %in% nms) {
+                args$CH.PARALLEL <- parallel
+            } else {
+                stop("iotools::chunk.apply supports neither `parallel` nor ",
+                     "`CH.PARALLEL`; cannot forward the parallelism argument")
+            }
         }
-    }
-    do.call(f, args)
-}
+        do.call(original_chunk_apply, args)
+    },
+    ns = "sequenza"
+)
 
 bin_seqz <- snakemake@input[['bin_seqz']]
 out_segment <- snakemake@output[['segment']]
