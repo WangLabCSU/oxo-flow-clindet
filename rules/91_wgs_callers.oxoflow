@@ -164,8 +164,8 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-T_pileupsummaries.table" ]
 resources = { threads = 10 }
-description = "gatk GetPileupSummaries tumor (upstream WGS M2_ST — no intervals)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk GetPileupSummaries -R {config.reference} -I {input.Tum} -V {input.af_vcf} -O {output[0]}"""
+description = "gatk GetPileupSummaries tumor (upstream WGS M2_ST; upstream omits -L but GATK 4.6.2 requires intervals — same fix as the WES port, the mini bed stands in for the WGS analysis region)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk GetPileupSummaries -R {config.reference} -I {input.Tum} -V {input.af_vcf} -L {config.target_bed} -O {output[0]}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
@@ -177,8 +177,8 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-NC_pileupsummaries.table" ]
 resources = { threads = 10 }
-description = "gatk GetPileupSummaries normal (upstream WGS M2_SNC)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk GetPileupSummaries -R {config.reference} -I {input.NC} -V {input.af_vcf} -O {output[0]}"""
+description = "gatk GetPileupSummaries normal (upstream WGS M2_SNC; -L as M2_ST)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk GetPileupSummaries -R {config.reference} -I {input.NC} -V {input.af_vcf} -L {config.target_bed} -O {output[0]}"""
 [rules.environment]
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 

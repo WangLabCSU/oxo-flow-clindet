@@ -1,0 +1,13 @@
+##fileformat=VCFv4.2
+##source=synthetic-mini-snps
+##contig=<ID=chr21,length=900>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr21	100	rsMINI_SNP001	T	C	50	PASS	.
+chr21	200	rsMINI_SNP002	A	G	50	PASS	.
+chr21	300	rsMINI_SNP003	A	G	50	PASS	.
+chr21	400	rsMINI_SNP004	C	T	50	PASS	.
+chr21	500	rsMINI_SNP005	C	T	50	PASS	.
+chr21	600	rsMINI_SNP006	A	G	50	PASS	.
+chr21	700	rsMINI_SNP007	A	G	50	PASS	.
+chr21	800	rsMINI_SNP008	G	A	50	PASS	.

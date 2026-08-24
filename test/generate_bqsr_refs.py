@@ -10,11 +10,11 @@ match the fixture reference and whose sites sit inside the reference
 contig — same role as the arriba mini DBs (documented synthetic fixtures;
 real runs point known_sites1/2 at the real varanno files).
 
-Outputs (committed, tiny):
-  test/fixtures/refs/annotations/known_sites1.mini.vcf.gz   (SNPs)
-  test/fixtures/refs/annotations/known_sites2.mini.vcf.gz   (indels)
+Outputs (plain VCF, then bgzip + tabix — GATK requires BGZF + .tbi; python's
+gzip module writes non-BGZF streams that tabix rejects):
+  test/fixtures/refs/annotations/known_sites1.mini.vcf[.gz][.tbi]   (SNPs)
+  test/fixtures/refs/annotations/known_sites2.mini.vcf[.gz][.tbi]   (indels)
 """
-import gzip
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -63,13 +63,14 @@ def main():
             f"chr21\t{pos}\trsMINI_INDEL{i + 1:03d}\t{ref_base}\t{ref_base}{alt}\t50\tPASS\t."
         )
 
-    with gzip.open(OUT / "known_sites1.mini.vcf.gz", "wt") as fh:
+    with open(OUT / "known_sites1.mini.vcf", "w") as fh:
         fh.write(header("synthetic-mini-snps") + "\n".join(snp_lines) + "\n")
-    with gzip.open(OUT / "known_sites2.mini.vcf.gz", "wt") as fh:
+    with open(OUT / "known_sites2.mini.vcf", "w") as fh:
         fh.write(header("synthetic-mini-indels") + "\n".join(indel_lines) + "\n")
 
     print(f"wrote {len(snp_lines)} SNP + {len(indel_lines)} indel mini sites "
           f"for a {length} bp chr21 -> {OUT}")
+    print("then: bgzip + tabix -p vcf each file (GATK needs BGZF + .tbi)")
 
 
 if __name__ == "__main__":

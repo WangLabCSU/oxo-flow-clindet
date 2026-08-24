@@ -22,10 +22,10 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T.txt" ]
 resources = { memory_mb = 1024 }
-description = "picard CollectWgsMetrics tumor (upstream WGS picard_collect_wgs)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
+description = "gatk CollectWgsMetrics tumor (upstream WGS picard_collect_wgs; the GATK wrapper in the gatk4 image, same as the WES picard rules — the bare bioconda `picard` shim misparses the tool args)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
 [rules.environment]
-conda = "envs/clindet.yaml"
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
 [[rules]]
 name = "picard_collect_wgs_normal"
@@ -35,10 +35,10 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC.txt" ]
 resources = { memory_mb = 1024 }
-description = "picard CollectWgsMetrics normal (upstream WGS picard_collect_wgs)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
+description = "gatk CollectWgsMetrics normal (upstream WGS picard_collect_wgs)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
 [rules.environment]
-conda = "envs/clindet.yaml"
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
 [[rules]]
 name = "picard_flength_wgs_tumor"
@@ -51,10 +51,10 @@ output = [
     "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.pdf"
 ]
 resources = { memory_mb = 1024 }
-description = "picard CollectInsertSizeMetrics tumor (upstream WGS picard_flength_wgs)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
+description = "gatk CollectInsertSizeMetrics tumor (upstream WGS picard_flength_wgs)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
 [rules.environment]
-conda = "envs/clindet.yaml"
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
 [[rules]]
 name = "picard_flength_wgs_normal"
@@ -67,10 +67,10 @@ output = [
     "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.pdf"
 ]
 resources = { memory_mb = 1024 }
-description = "picard CollectInsertSizeMetrics normal (upstream WGS picard_flength_wgs)"
-shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
+description = "gatk CollectInsertSizeMetrics normal (upstream WGS picard_flength_wgs)"
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
 [rules.environment]
-conda = "envs/clindet.yaml"
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
 # ------------------------------------------------------------ delly ----
 [[rules]]
