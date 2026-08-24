@@ -67,22 +67,24 @@ if (length(GCcontentfile) == 0 || nchar(GCcontentfile) == 0) GCcontentfile <- NU
 if (length(rp_file) == 0 || nchar(rp_file) == 0) rp_file <- NULL
 
 library(ASCAT)
-ascat.prepareHTS(
-  tumourseqfile = input_tumor_bam,
-  normalseqfile = input_normal_bam,
-  tumourname = "Tumor",
-  normalname = "Germline",
-  allelecounter_exe = 'alleleCounter',
-  loci.prefix = loci.prefix,
-  alleles.prefix = alleles.prefix,
-  gender = gender,
-  genomeVersion = f_gv,
-  nthreads = threads,
-  chrom_names = chrom_names,
-  tumourLogR_file = "Tumor_LogR.txt",
-  tumourBAF_file = "Tumor_BAF.txt",
-  normalLogR_file = "Germline_LogR.txt",
-  normalBAF_file = "Germline_BAF.txt")
+prepare <- function() {
+  ascat.prepareHTS(
+    tumourseqfile = input_tumor_bam,
+    normalseqfile = input_normal_bam,
+    tumourname = "Tumor",
+    normalname = "Germline",
+    allelecounter_exe = 'alleleCounter',
+    loci.prefix = loci.prefix,
+    alleles.prefix = alleles.prefix,
+    gender = gender,
+    genomeVersion = f_gv,
+    nthreads = threads,
+    chrom_names = chrom_names,
+    tumourLogR_file = "Tumor_LogR.txt",
+    tumourBAF_file = "Tumor_BAF.txt",
+    normalLogR_file = "Germline_LogR.txt",
+    normalBAF_file = "Germline_BAF.txt")
+}
   
 
 # Mini-fixture accommodation (documented): the synthetic 9-locus kit on the
@@ -100,6 +102,7 @@ mini_fallback <- function(err) {
     save(ascat.bc, ascat.output, QC, file = output_rdata)
 }
 tryCatch({
+    prepare()
     ascat.bc = ascat.loadData(
       Tumor_LogR_file = "Tumor_LogR.txt",
       Tumor_BAF_file = "Tumor_BAF.txt",
