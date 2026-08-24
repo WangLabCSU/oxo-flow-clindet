@@ -1,5 +1,8 @@
 # r-sequenza (fit/results) — separate env from sequenza-utils, see
-# envs/sequenza.yaml for the reason.
+# envs/sequenza.yaml for the reason. Note: r-sequenza 3.0.0's
+# gc.sample.stats passes `parallel` to iotools::chunk.apply, which only
+# accepts CH.PARALLEL (live: "unused argument (parallel = N)"); worked
+# around by a documented chunk.apply shim in scripts/sequenza_call.R.
 name: sequenza_r
 channels:
   - conda-forge

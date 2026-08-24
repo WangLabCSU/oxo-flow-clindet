@@ -98,8 +98,8 @@ output = {
 }
 description = "symlink unpaired tumor dedup BAM to recal path when recal_BQSR=False"
 when = "!config.recal_bqsr"
-shell = """ln -s $(realpath {input.bam}) {output.bam}
-ln -s $(realpath {input.bai}) {output.bai}"""
+shell = """ln -sfn $(realpath {input.bam}) {output.bam}
+ln -sfn $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 
