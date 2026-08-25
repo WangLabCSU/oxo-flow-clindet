@@ -56,83 +56,54 @@ git clone https://github.com/WangLabCSU/oxo-flow-clindet.git
 
 ## Usage
 
+Single entry file, mirroring the upstream Snakefile: `[config] run_type`
+selects the rule tree, and paired vs tumor-only WES derives **per pair**
+from the sample sheet.
+
 ```bash
 # 1. prepare data (see test/fixtures for the expected layout; fill in your
 #    own reads/reference/annotation paths in main.oxoflow or override on the
 #    command line)
 # 2. preview the plan
-oxo-flow dry-run main.oxoflow
+oxo-flow dry-run main.oxoflow                  # run_type = wes (default)
+oxo-flow dry-run main.oxoflow --arg run_type=wgs
+oxo-flow dry-run main.oxoflow --arg run_type=rna
 # 3. run
 oxo-flow run main.oxoflow -j 8
 ```
 
-The samplesheet (`samplesheet.csv`) holds one `pair_id` per tumor/normal
-pair: columns `pair_id,experiment,control,experiment_type`.
+### Run types (upstream VALID_RUN_TYPES)
 
-## RNA sub-workflow
+| run_type | Tree |
+|---|---|
+| `wes` (default) | paired WES for pairs with a control; **tumor-only WES for pairs without** (seven portable callers: Mutect2, HaplotypeCaller, varscan2, Strelka+Manta, vardict, lofreq, freebayes) — upstream's sample-sheet-derived branches, one DAG |
+| `wgs` | WGS metrics + the paired callers with WGS config (`rules/91_wgs_callers.oxoflow` — no `--intervals`/`--callRegions`/`--exome`, Manta `somaticSV`) + delly/svaba SV chains (`rules/90_wgs.oxoflow`) |
+| `rna` | fastp → STAR (arriba + mutation maps) → arriba fusion → SplitNCigarReads → unpaired SNV callers → VEP-gated MAF tail (upstream default stages `arriba` + `call_mut`) |
 
-`main_rna.oxoflow` ports the upstream **workflow/RNA** entry
-(`wrapper/rna.smk`, run_type `rna`): fastp → STAR (arriba + mutation maps) →
-arriba fusion calling → SplitNCigarReads → unpaired SNV callers → VEP-gated
-vcf2maf/MAF merge tail. The upstream mini-test default stages (`arriba`,
-`call_mut`) map to explicit rule targets; the RSEM/kallisto/salmon/TRUST4
-quant rules and isofox are not in the default stages upstream and run only
-when targeted:
+Upstream also defines `build_b37`/`build_hg38` (reference builders) and
+`pull_zenodo` (data pull) run types — reference-data utilities without a
+mini fixture; not ported (documented).
+
+The samplesheet (`samplesheet.csv`) holds one row per pair:
+`pair_id,experiment,control,experiment_type` — leave `control` empty for a
+tumor-only pair. Requires oxo-flow with wildcard-scoped `when` predicates
+(`wildcard.<key>`, Traitome/oxo-flow PR #187).
+
+### RNA default stages (targeted)
+
+The upstream mini-test default stages (`arriba`, `call_mut`) map to explicit
+rule targets; RSEM/kallisto/salmon/TRUST4 quant rules and isofox are not in
+the default stages upstream and run only when targeted:
 
 ```bash
-# preview / run the default stages (arriba + call_mut)
-oxo-flow dry-run main_rna.oxoflow \
+oxo-flow run main.oxoflow --arg run_type=rna -j 8 \
   -t fastp_trim -t STAR_1_pass -t STAR_arriba_map -t STAR_mut_map \
   -t arriba_fusion -t link_bam -t SplitNCigarReads \
   -t mutect2 -t M2_filter -t unpaired -t call_variants -t lofreq \
   -t varscan2 -t norm_filter
-oxo-flow run main_rna.oxoflow -j 8 <same -t flags>
 
 # quant extras (need rsem/kallisto/salmon indexes — empty in the fixture kit)
-oxo-flow run main_rna.oxoflow -t cal_exp_RSEM -t kallisto -t salmon -t TRUST4_TBCR
-```
-
-Same samplesheet and fixture kit as the DNA path; the vcf2maf/MAF tail gates
-on `vep_cache_ready` (see `[config]`). Deviations are documented in the
-`rules/rna/*.oxoflow` headers.
-
-## Unpaired (tumor-only) sub-workflow
-
-`main_unpaired.oxoflow` ports the upstream **WES unpaired branch**
-(`workflow/WES/rules/rtm/unpaired`, driven upstream by sample-sheet rows
-without Normal fastqs): fastp → bwa → markdup → recal (link or BQSR) →
-seven tumor-only callers (Mutect2 + FilterMutectCalls, HaplotypeCaller,
-varscan2, Strelka+Manta germline, vardict, lofreq, freebayes) →
-`merge_unpaired_vcf` (verbatim `merge_caller_vcfs.py` via `scripts/smk.py`),
-plus the VEP-gated vcf2maf/MAF tail. The upstream shipped default
-`tumor_only_caller: [sage]` and the deepvariant/pindel unpaired callers run
-in the upstream's custom containers (hmftools/deepsomatic/pindel sif +
-multi-GB HMF/Sanger resource trees) — documented as exclusions in
-`rules/70_unpaired.oxoflow`; the port defaults to the seven
-conda/container-portable callers instead.
-
-```bash
-oxo-flow dry-run main_unpaired.oxoflow   # 21 run / 11 skip under default config
-oxo-flow run main_unpaired.oxoflow -j 8
-```
-
-## WGS sub-workflow
-
-`main_wgs.oxoflow` ports the upstream **workflow/WGS** run type
-(`wrapper/wgs.smk`): the shared mapping/dedup/recal chain and the
-vcf_norm/vcf2maf/merge/flag/report/CNV tail, plus the WGS-specific
-`rules/91_wgs_callers.oxoflow` (callers without exome restrictions —
-no `--intervals`/`--callRegions`/`--exome`, Manta emits `somaticSV`,
-germline Strelka takes both bams, vardict regions generated from the
-`.fai`) and `rules/90_wgs.oxoflow` (CollectWgsMetrics/
-CollectInsertSizeMetrics + delly/svaba SV chains; Manta SV comes from the
-WGS Manta config rule). Upstream has no WGS mini-test config, so the
-fixture run is an honest pseudo-WGS smoke test on the chr21 fixture
-reference (see the workflow header).
-
-```bash
-oxo-flow dry-run main_wgs.oxoflow
-oxo-flow run main_wgs.oxoflow -j 8
+oxo-flow run main.oxoflow --arg run_type=rna -t cal_exp_RSEM -t kallisto -t salmon -t TRUST4_TBCR
 ```
 
 ## Non-human genomes (config parity)
@@ -233,14 +204,19 @@ bash test/run.sh      # DNA: validate + lint + dry-run, exits 0
 bash test/run_rna.sh  # RNA: validate + lint + dry-run (default stages), exits 0
 ```
 
-## Live verification (tx-ubuntu, oxo-flow 0.14.1)
+## Live verification (tx-ubuntu, oxo-flow 0.14.1 / PR #187 engine)
 
-| Workflow | Status | Notes |
+| Run type | Status | Notes |
 |---|---|---|
-| paired WES (`main.oxoflow`) | ✅ live-verified | full pipeline on the mini fixture, incl. opt-in BQSR (`recal_bqsr=true`) and the CNV subset (`cnv_enabled=true`: Control-FREEC, Sequenza, ExomeDepth, ASCAT) |
-| unpaired WES (`main_unpaired.oxoflow`) | ✅ live-verified ×2 | 7 tumor-only callers + merge |
-| WGS (`main_wgs.oxoflow`) | ✅ live-verified | WGS metrics, delly SV chain (incl. germ), svaba, Manta somaticSV, MuSE/Strelka2 WGS configs |
-| RNA (`main_rna.oxoflow`) | ✅ live-verified | arriba/TRUST4/isofox default stages |
+| wes paired (control set) | ✅ live-verified | full pipeline on the mini fixture, incl. opt-in BQSR (`recal_bqsr=true`) and the CNV subset (`cnv_enabled=true`: Control-FREEC, Sequenza, ExomeDepth, ASCAT) |
+| wes tumor-only (control empty) | ✅ live-verified ×2 | 7 tumor-only callers + merge |
+| wgs | ✅ live-verified | WGS metrics, delly SV chain (incl. germ), svaba, Manta somaticSV, MuSE/Strelka2 WGS configs |
+| rna | ✅ live-verified | arriba/TRUST4/isofox default stages |
+
+The four entries above were live-verified as separate entry files; the
+merged single-entry form (run_type dispatch + per-pair paired/unpaired
+derivation, engine PR #187) passes validate + dry-run on all run types and
+its live re-verification runs on tx-ubuntu with the PR #187 engine.
 
 Mini-fixture degeneracy (900 bp chr21 + 20 kb chrX) is handled with
 documented fallbacks where a tool needs real signal (ExomeDepth/ASCAT/
