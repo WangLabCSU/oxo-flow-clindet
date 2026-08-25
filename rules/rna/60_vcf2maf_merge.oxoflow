@@ -113,7 +113,7 @@ conda = "envs/clindet_vep.yaml"
 [[rules]]
 name = "merge_rna_maf"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.rna_caller_list", pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.rna_caller_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/maf/{pair_id}/merge/{pair_id}.maf" ]
 description = "merge per-caller RNA MAFs (upstream merge_rna_maf + merge_maf.R via the smk.R shim; sample barcode becomes {sample}_T)"

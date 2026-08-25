@@ -218,64 +218,64 @@ path = "rules/rna/60_vcf2maf_merge.oxoflow"
 [[rules]]
 name = "all_vcf"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf", variables = { pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf", variables = {} }
 ]
-output = ["{config.output_dir}/{config.genome_version}/results/all_vcf.done"]
+output = ["{config.output_dir}/{config.genome_version}/results/all_vcf_{pair_id}.done"]
 when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 shell = "touch {output[0]}"
 
 [[rules]]
 name = "all_cnv"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/{pair_id}-T.bam_ratio.txt.png", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_segments.txt", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/exomedepth/{pair_id}/{pair_id}_exomedepth.tsv", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_purity.ploidy.tsv", variables = { pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/{pair_id}-T.bam_ratio.txt.png", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_segments.txt", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/exomedepth/{pair_id}/{pair_id}_exomedepth.tsv", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_purity.ploidy.tsv", variables = {} }
 ]
-output = ["{config.output_dir}/{config.genome_version}/results/all_cnv.done"]
+output = ["{config.output_dir}/{config.genome_version}/results/all_cnv_{pair_id}.done"]
 when = "config.cnv_enabled && ((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs')"
 shell = "touch {output[0]}"
 
 [[rules]]
 name = "all_sv"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter_bnd.vcf", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_germ.vcf", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.sv.vcf", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/somaticSV.vcf.gz", variables = { pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter_bnd.vcf", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_germ.vcf", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.sv.vcf", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/somaticSV.vcf.gz", variables = {} }
 ]
-output = ["{config.output_dir}/{config.genome_version}/results/all_sv.done"]
+output = ["{config.output_dir}/{config.genome_version}/results/all_sv_{pair_id}.done"]
 when = "config.run_type == 'wgs' && wildcard.control != ''"
 shell = "touch {output[0]}"
 
 [[rules]]
 name = "all"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.maf", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_report.html", variables = { pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/merge/{pair_id}.maf", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.maf", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_report.html", variables = {} }
 ]
-output = ["{config.output_dir}/{config.genome_version}/results/all.done"]
+output = ["{config.output_dir}/{config.genome_version}/results/all_{pair_id}.done"]
 when = "config.vep_cache_ready && ((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs')"
 shell = "touch {output[0]}"
 
 [[rules]]
 name = "all_unpaired"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam", variables = { pair_id = "{pair_id}" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/merge/{pair_id}.vcf", variables = { pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam", variables = {} },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/merge/{pair_id}.vcf", variables = {} }
 ]
-output = ["{config.output_dir}/{config.genome_version}/results/unpaired_all.done"]
+output = ["{config.output_dir}/{config.genome_version}/results/unpaired_all_{pair_id}.done"]
 when = "config.run_type == 'wes' && wildcard.control == ''"
 shell = "touch {output[0]}"
 
 [[rules]]
 name = "all_unpaired_maf"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/merge/{pair_id}.maf", variables = {} }
 ]
-output = ["{config.output_dir}/{config.genome_version}/results/unpaired_all_maf.done"]
+output = ["{config.output_dir}/{config.genome_version}/results/unpaired_all_maf_{pair_id}.done"]
 when = "config.vep_cache_ready && (config.run_type == 'wes' && wildcard.control == '')"
 shell = "touch {output[0]}"

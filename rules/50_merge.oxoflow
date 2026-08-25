@@ -14,7 +14,7 @@ name = "merge"
 name = "merge_paired_vcf"
 when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/{caller}.vcf", variables = { caller = "config.somatic_caller_list", pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/{caller}.vcf", variables = { caller = "config.somatic_caller_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf" ]
 description = "merge per-caller normalized VCFs (upstream merge_paired_vcf + merge_caller_vcfs.py)"
@@ -26,7 +26,7 @@ conda = "envs/clindet.yaml"
 [[rules]]
 name = "merge_paired_maf"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.somatic_caller_list", pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.somatic_caller_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf" ]
 description = "merge per-caller MAFs (upstream merge_paired_maf + merge_maf.R)"
@@ -39,7 +39,7 @@ conda = "envs/clindet.yaml"
 [[rules]]
 name = "merge_paired_germ_maf"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.germ_caller_list", pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.germ_caller_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/merge/{pair_id}.maf" ]
 description = "merge germline per-caller MAFs (upstream merge_paired_germ_maf + merge_maf.R)"

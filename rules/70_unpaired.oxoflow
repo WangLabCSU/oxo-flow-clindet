@@ -389,7 +389,7 @@ singularity = "https://depot.galaxyproject.org/singularity/freebayes%3A1.3.9--hb
 name = "merge_unpaired_vcf"
 when = "config.run_type == 'wes' && wildcard.control == ''"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/{caller}.vcf", variables = { caller = "config.unpaired_caller_list", pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/{caller}.vcf", variables = { caller = "config.unpaired_caller_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/merge/{pair_id}.vcf" ]
 description = "merge per-caller VCFs (upstream merge_unpaired_vcf + merge_caller_vcfs.py)"
@@ -495,7 +495,7 @@ conda = "envs/clindet_vep.yaml"
 [[rules]]
 name = "merge_unpaired_maf"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.unpaired_caller_list", pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/{caller}.vcf.maf", variables = { caller = "config.unpaired_caller_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/merge/{pair_id}.maf" ]
 description = "merge per-caller MAFs (upstream merge_unpaired_maf + merge_maf.R)"

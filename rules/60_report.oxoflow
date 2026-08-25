@@ -45,7 +45,7 @@ conda = "envs/clindet.yaml"
 [[rules]]
 name = "combined_multiqc_prep_multiqc_data"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt", variables = { pair_id = "{pair_id}" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt", variables = { pair_id = "config.pairs_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/multiqc/filelist.txt" ]
 when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.run_report)"
