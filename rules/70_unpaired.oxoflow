@@ -41,7 +41,7 @@ name = "unpaired"
 
 # ---------------------------------------------------------------- fastp ----
 [[rules]]
-name = "fastp_tumor_sample"
+name = "fastp_tumor_sample_unpaired"
 when = "config.run_type == 'wes' && wildcard.control == ''"
 input = { R1 = "{config.tumor_fastq_r1}", R2 = "{config.tumor_fastq_r2}" }
 output = [
@@ -58,7 +58,7 @@ conda = "envs/clindet.yaml"
 
 # --------------------------------------------------------------- mapping ----
 [[rules]]
-name = "map_reads_tumor"
+name = "map_reads_tumor_unpaired"
 when = "config.run_type == 'wes' && wildcard.control == ''"
 input = {
     R1 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R1.fastq.gz",
@@ -75,7 +75,7 @@ conda = "envs/clindet.yaml"
 
 # -------------------------------------------------------- mark duplicates ----
 [[rules]]
-name = "mark_duplicates_tumor"
+name = "mark_duplicates_tumor_unpaired"
 when = "config.run_type == 'wes' && wildcard.control == ''"
 input = [ "{config.output_dir}/{config.genome_version}/results/mapped/unpaired/{pair_id}-T.sorted.bam" ]
 output = {
@@ -90,7 +90,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 # ----------------------------------------------------- recal link / BQSR ----
 [[rules]]
-name = "recal_link_tumor"
+name = "recal_link_tumor_unpaired"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bam",
     bai = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bai"
@@ -107,7 +107,7 @@ ln -sfn $(realpath {input.bai}) {output.bai}"""
 conda = "envs/clindet.yaml"
 
 [[rules]]
-name = "recalibrate_base_qualities_tumor"
+name = "recalibrate_base_qualities_tumor_unpaired"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bam",
     ref = "{config.reference}",
@@ -124,7 +124,7 @@ gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O 
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
 [[rules]]
-name = "apply_base_quality_recalibration_tumor"
+name = "apply_base_quality_recalibration_tumor_unpaired"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/dedup/unpaired/{pair_id}-T.sorted.bam",
     ref = "{config.reference}",

@@ -54,7 +54,7 @@ shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && if [ 
 singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
 
 [[rules]]
-name = "M2_filter_unpaired"
+name = "M2_filter_unpaired_rna"
 when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
@@ -69,7 +69,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 # -------------------------------------------------------------- freebayes ----
 [[rules]]
-name = "unpaired_freebayes"
+name = "unpaired_freebayes_rna"
 when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
@@ -98,7 +98,7 @@ conda = "envs/clindet.yaml"
 
 # -------------------------------------------------------- HaplotypeCaller ----
 [[rules]]
-name = "call_variants_HaplotypeCaller"
+name = "call_variants_HaplotypeCaller_rna"
 when = "config.run_type == 'rna'"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
@@ -126,7 +126,7 @@ conda = "envs/clindet.yaml"
 
 # ------------------------------------------------------ Strelka2 + Manta ----
 [[rules]]
-name = "unpaired_call_config_strelka"
+name = "unpaired_call_config_strelka_rna"
 when = "config.run_type == 'rna'"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
@@ -148,7 +148,7 @@ touch {output[0]}"""
 conda = "envs/strelka.yaml"
 
 [[rules]]
-name = "unpaired_call_strelka_manta"
+name = "unpaired_call_strelka_manta_rna"
 when = "config.run_type == 'rna'"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
@@ -171,7 +171,7 @@ touch {output[1]}"""
 conda = "envs/strelka.yaml"
 
 [[rules]]
-name = "unpaired_strelka_filter"
+name = "unpaired_strelka_filter_rna"
 when = "config.run_type == 'rna'"
 input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/{pair_id}-Strelka.log" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/strelka.vcf" ]
@@ -213,7 +213,7 @@ conda = "envs/clindet.yaml"
 
 # ---------------------------------------------------------------- vardict ----
 [[rules]]
-name = "unpaired_vardict_single_mode"
+name = "unpaired_vardict_single_mode_rna"
 when = "config.run_type == 'rna'"
 input = {
     reference = "{config.reference}",
@@ -228,7 +228,7 @@ shell = """vardict-java -G {input.reference} -th {threads} -c 1 -S 2 -E 3 -g 4 -
 singularity = "https://depot.galaxyproject.org/singularity/vardict-java%3A1.8.3--hdfd78af_0"
 
 [[rules]]
-name = "unpaired_filter_vardict"
+name = "unpaired_filter_vardict_rna"
 when = "config.run_type == 'rna'"
 input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/VarDict/{pair_id}.vardict.vcf" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/vardict.vcf" ]
@@ -239,7 +239,7 @@ conda = "envs/clindet.yaml"
 
 # --------------------------------------------------------------- varscan2 ----
 [[rules]]
-name = "varscan2_mpileup_unpaired"
+name = "varscan2_mpileup_unpaired_rna"
 when = "config.run_type == 'rna'"
 input = {
     regions = "{config.target_bed}",
@@ -254,7 +254,7 @@ shell = """samtools mpileup -q 1 -Q 1 -f {input.ref} -l {input.regions} {input.t
 conda = "envs/clindet.yaml"
 
 [[rules]]
-name = "varscan2_call_unpaired_snp"
+name = "varscan2_call_unpaired_snp_rna"
 when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
@@ -268,7 +268,7 @@ shell = """varscan mpileup2snp {input.tumor} --min-coverage 10 --min-var-freq 0.
 conda = "envs/clindet.yaml"
 
 [[rules]]
-name = "varscan2_call_unpaired_indel"
+name = "varscan2_call_unpaired_indel_rna"
 when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
@@ -308,7 +308,7 @@ shell = """varscan filter {input[0]} --min-reads2 4 --min-var-freq 0.15 --p-valu
 conda = "envs/clindet.yaml"
 
 [[rules]]
-name = "varscan2_merge_unpaired"
+name = "varscan2_merge_unpaired_rna"
 when = "config.run_type == 'rna'"
 input = {
     snp = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.snp.filter.vcf",
