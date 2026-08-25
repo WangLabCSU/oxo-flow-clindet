@@ -29,6 +29,7 @@ name = "rna_call_mut"
 
 [[rules]]
 name = "link_bam"
+when = "config.run_type == 'rna'"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/{pair_id}.sorted.bam",
     bai = "{config.output_dir}/{config.genome_version}/results/mut/STAR/{pair_id}/{pair_id}.sorted.bam.bai"
@@ -48,6 +49,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "SplitNCigarReads"
+when = "config.run_type == 'rna'"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.rmdep.bam",
     ref = "{config.reference}"

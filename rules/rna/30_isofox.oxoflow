@@ -24,6 +24,7 @@ name = "rna_isofox"
 
 [[rules]]
 name = "STAR_isofox_map"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}"
@@ -44,6 +45,7 @@ conda = "envs/rsem.yaml"
 
 [[rules]]
 name = "isofox_call"
+when = "config.run_type == 'rna'"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/summary/isofox/{pair_id}/{pair_id}.sorted.bam",
     ref_genome = "{config.reference}"

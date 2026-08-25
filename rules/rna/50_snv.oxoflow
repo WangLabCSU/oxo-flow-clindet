@@ -41,6 +41,7 @@ name = "rna_snv"
 # --------------------------------------------------------------- Mutect2 ----
 [[rules]]
 name = "mutect2_call"
+when = "config.run_type == 'rna'"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
     ref = "{config.reference}"
@@ -54,6 +55,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 [[rules]]
 name = "M2_filter_unpaired"
+when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
     vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/Mutect2_raw.vcf"
@@ -68,6 +70,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 # -------------------------------------------------------------- freebayes ----
 [[rules]]
 name = "unpaired_freebayes"
+when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
     bam = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
@@ -82,6 +85,7 @@ singularity = "https://depot.galaxyproject.org/singularity/freebayes%3A1.3.9--hb
 
 [[rules]]
 name = "norm_filter_freebayes"
+when = "config.run_type == 'rna'"
 input = {
     vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/freebayes.vcf",
     ref = "{config.reference}"
@@ -95,6 +99,7 @@ conda = "envs/clindet.yaml"
 # -------------------------------------------------------- HaplotypeCaller ----
 [[rules]]
 name = "call_variants_HaplotypeCaller"
+when = "config.run_type == 'rna'"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
     ref = "{config.reference}"
@@ -108,6 +113,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 [[rules]]
 name = "norm_filter_HaplotypeCaller"
+when = "config.run_type == 'rna'"
 input = {
     vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/HaplotypeCaller.vcf",
     ref = "{config.reference}"
@@ -121,6 +127,7 @@ conda = "envs/clindet.yaml"
 # ------------------------------------------------------ Strelka2 + Manta ----
 [[rules]]
 name = "unpaired_call_config_strelka"
+when = "config.run_type == 'rna'"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
     ref = "{config.reference}",
@@ -142,6 +149,7 @@ conda = "envs/strelka.yaml"
 
 [[rules]]
 name = "unpaired_call_strelka_manta"
+when = "config.run_type == 'rna'"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
     ref = "{config.reference}",
@@ -164,6 +172,7 @@ conda = "envs/strelka.yaml"
 
 [[rules]]
 name = "unpaired_strelka_filter"
+when = "config.run_type == 'rna'"
 input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/{pair_id}-Strelka.log" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/strelka.vcf" ]
 description = "keep PASS strelka variants (upstream unpaired_strelka_filter; no conda env upstream — port pins envs/clindet.yaml for bcftools; strelka.vcf is not in the default rna_caller_list, so it is never vcf2maf'd)"
@@ -174,6 +183,7 @@ conda = "envs/clindet.yaml"
 # ---------------------------------------------------------------- Lofreq ----
 [[rules]]
 name = "lofreq_call_up"
+when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
     Tum = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam"
@@ -190,6 +200,7 @@ singularity = "https://depot.galaxyproject.org/singularity/lofreq:broken---2.5.1
 
 [[rules]]
 name = "lofreq_norm_filter"
+when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
     vcf = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/lofreq_raw.vcf"
@@ -203,6 +214,7 @@ conda = "envs/clindet.yaml"
 # ---------------------------------------------------------------- vardict ----
 [[rules]]
 name = "unpaired_vardict_single_mode"
+when = "config.run_type == 'rna'"
 input = {
     reference = "{config.reference}",
     regions = "{config.target_bed}",
@@ -217,6 +229,7 @@ singularity = "https://depot.galaxyproject.org/singularity/vardict-java%3A1.8.3-
 
 [[rules]]
 name = "unpaired_filter_vardict"
+when = "config.run_type == 'rna'"
 input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/VarDict/{pair_id}.vardict.vcf" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/vardict.vcf" ]
 description = "bcftools PASS/DP/VD filter on vardict (upstream unpaired_filter_vardict)"
@@ -227,6 +240,7 @@ conda = "envs/clindet.yaml"
 # --------------------------------------------------------------- varscan2 ----
 [[rules]]
 name = "varscan2_mpileup_unpaired"
+when = "config.run_type == 'rna'"
 input = {
     regions = "{config.target_bed}",
     tumor = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}.split.bam",
@@ -241,6 +255,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_call_unpaired_snp"
+when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
     tumor = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}-T.mp",
@@ -254,6 +269,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_call_unpaired_indel"
+when = "config.run_type == 'rna'"
 input = {
     ref = "{config.reference}",
     tumor = "{config.output_dir}/{config.genome_version}/results/mut/dedup/{pair_id}-T.mp",
@@ -267,6 +283,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_filter_snp"
+when = "config.run_type == 'rna'"
 input = {
     snp = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.snp.vcf",
     indel = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.vcf"
@@ -279,6 +296,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_filter_indel"
+when = "config.run_type == 'rna'"
 input = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.vcf" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.filter.vcf" ]
 description = "varscan filter on indels (upstream varscan2_filter_indel)"
@@ -291,6 +309,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_merge_unpaired"
+when = "config.run_type == 'rna'"
 input = {
     snp = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.snp.filter.vcf",
     indel = "{config.output_dir}/{config.genome_version}/results/mut/vcf/{pair_id}/varscan/varscan2.indel.filter.vcf"

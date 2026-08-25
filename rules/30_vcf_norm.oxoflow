@@ -14,6 +14,7 @@ name = "vcf_norm"
 # ---------------------------------------------------------------- Mutect2 ----
 [[rules]]
 name = "vcf_norm_Mutect2"
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Mutect2.vcf",
     "{config.reference}"
@@ -27,6 +28,7 @@ conda = "envs/clindet.yaml"
 # ---------------------------------------------------------------- vardict ----
 [[rules]]
 name = "vcf_norm_vardict"
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/vardict.vcf",
     "{config.reference}"
@@ -48,6 +50,7 @@ conda = "envs/clindet.yaml"
 # --------------------------------------------------------------- varscan2 ----
 [[rules]]
 name = "vcf_norm_varscan2"
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.vcf",
     "{config.reference}"
@@ -61,6 +64,7 @@ conda = "envs/clindet.yaml"
 # ------------------------------------------------------------------- muse ----
 [[rules]]
 name = "vcf_norm_muse"
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/muse.vcf",
     "{config.reference}"
@@ -74,6 +78,7 @@ conda = "envs/clindet.yaml"
 # -------------------------------------------------------- HaplotypeCaller ----
 [[rules]]
 name = "vcf_norm_HaplotypeCaller"
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/HaplotypeCaller.vcf",
     "{config.reference}"
@@ -87,6 +92,7 @@ conda = "envs/clindet.yaml"
 # -------------------------------------------------- germline: strelkamanta ----
 [[rules]]
 name = "vcf_norm_germline_strelkamanta"
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/strelkamanta.vcf",
     "{config.reference}"
@@ -100,6 +106,7 @@ conda = "envs/clindet.yaml"
 # -------------------------------------------------- germline: caveman ----
 [[rules]]
 name = "vcf_norm_germline_caveman"
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/caveman.vcf",
     "{config.reference}"

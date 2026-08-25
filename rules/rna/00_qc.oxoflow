@@ -52,6 +52,7 @@ name = "rna_qc"
 
 [[rules]]
 name = "fastp_trim"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}"

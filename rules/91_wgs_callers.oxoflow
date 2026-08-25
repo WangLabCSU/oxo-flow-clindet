@@ -22,6 +22,7 @@ name = "wgs_callers"
 # ------------------------------------------------------ Manta (WGS) ----
 [[rules]]
 name = "call_config_strelka"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -43,6 +44,7 @@ conda = "envs/strelka.yaml"
 # ------------------------------------------ Strelka2 germline (WGS) ----
 [[rules]]
 name = "call_strelka_manta"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -63,6 +65,7 @@ conda = "envs/strelka.yaml"
 
 [[rules]]
 name = "merge_strelka_manta"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta/results/variants/variants.vcf.gz" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/strelkamanta.vcf" ]
 description = "merge Strelka2 germline variants (WGS; same output path as the WES port so the shared germline tail consumes it)"
@@ -75,6 +78,7 @@ conda = "envs/clindet.yaml"
 # ------------------------------------------- Strelka2 somatic (WGS) ----
 [[rules]]
 name = "call_strelka_somatic_manta"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -96,6 +100,7 @@ conda = "envs/strelka.yaml"
 
 [[rules]]
 name = "merge_strelka_somatic_manta"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.snvs.vcf.gz",
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.indels.vcf.gz"
@@ -111,6 +116,7 @@ conda = "envs/clindet.yaml"
 # ------------------------------------------------------------------- MuSE ----
 [[rules]]
 name = "muse_call"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     reference = "{config.reference}",
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
@@ -137,6 +143,7 @@ singularity = "https://depot.galaxyproject.org/singularity/muse%3A2.1.2--h3b3e33
 
 [[rules]]
 name = "muse_sump"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/{pair_id}.MuSE.txt" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/muse.vcf" ]
 resources = { threads = 10 }
@@ -158,6 +165,7 @@ singularity = "https://depot.galaxyproject.org/singularity/muse%3A2.1.2--h3b3e33
 # --------------------------------------------------------------- Mutect2 ----
 [[rules]]
 name = "M2_ST"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     af_vcf = "{config.mutect2_vcf}"
@@ -171,6 +179,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 [[rules]]
 name = "M2_SNC"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
     af_vcf = "{config.mutect2_vcf}"
@@ -184,6 +193,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 [[rules]]
 name = "M2_contam"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     T = "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-T_pileupsummaries.table",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/{pair_id}/{pair_id}-NC_pileupsummaries.table"
@@ -200,6 +210,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 [[rules]]
 name = "mutect2"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -214,6 +225,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 [[rules]]
 name = "M2_filter"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     ref = "{config.reference}",
     vcf = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Mutect2_raw.vcf",
@@ -231,6 +243,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 # ------------------------------------------------------- HaplotypeCaller ----
 [[rules]]
 name = "call_variants_HaplotypeCaller"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -246,6 +259,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 # --------------------------------------------------------------- varscan2 ----
 [[rules]]
 name = "varscan2_mpileup"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     ref = "{config.reference}",
     normal = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -264,6 +278,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_call"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     normal = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.mp",
     tumor = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.mp"
@@ -280,6 +295,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_processSomatic"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.vcf",
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.vcf"
@@ -307,6 +323,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_som_filter"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     indel = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.vcf",
     snp_som_hc = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Somatic.hc.vcf"
@@ -320,6 +337,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "varscan2_merge_somatic"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     snp_som_hc_filter = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.snp.Somatic.hc.filter.vcf",
     indel_som_hc = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/varscan2.indel.Somatic.hc.vcf"
@@ -339,6 +357,7 @@ conda = "envs/clindet.yaml"
 # ---------------------------------------------------------------- vardict ----
 [[rules]]
 name = "vardict_wgs_bed"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = [ "{config.reference}.fai" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{config.genome_version}.bed" ]
 description = "whole-genome regions bed from the reference .fai (upstream WGS vardict_wgs_bed)"
@@ -348,6 +367,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "vardict_paired_mode"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = {
     reference = "{config.reference}",
     regions = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{config.genome_version}.bed",
@@ -363,6 +383,7 @@ singularity = "https://depot.galaxyproject.org/singularity/vardict-java%3A1.8.3-
 
 [[rules]]
 name = "vardict_filter_somatic"
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 input = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/vardict_raw.vcf" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/vardict.vcf" ]
 description = "bcftools view StrongSomatic/LikelySomatic + PASS + SSF <= 0.05 (upstream WGS vardict_filter_somatic)"

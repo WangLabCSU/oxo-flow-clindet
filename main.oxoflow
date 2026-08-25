@@ -1,13 +1,23 @@
 # oxo-flow port of clindet (zyllifeworld/clindet @ 582a9131)
-# Clinical WES tumor/normal variant calling pipeline: fastp -> bwa+fixmate ->
-# markdup -> SNV callers (Mutect2/vardict/varscan2/MuSE/HaplotypeCaller) ->
-# germline callers (Strelka2+Manta, CaVEMan) -> vcf_norm -> vcf2maf (VEP) ->
-# merged MAF -> mutation flagging -> cancer report + MultiQC.
+# Single entry file mirroring the upstream Snakefile: `run_type` selects
+# wes / wgs / rna (upstream's VALID_RUN_TYPES minus the reference-building
+# utilities build_b37/build_hg38/pull_zenodo, documented below), and
+# paired vs unpaired WES is derived per pair from the sample sheet
+# (`wildcard.control` — a pair without a control runs the tumor-only
+# tree, exactly like upstream's sample-sheet-derived branches).
+#
+# Run types:
+#   run_type = "wes"   (default) paired WES + tumor-only WES per sheet
+#   run_type = "wgs"   WGS (WGS metrics, delly/svaba SV, WGS callers)
+#   run_type = "rna"   RNA (arriba/TRUST4/isofox default stages)
+# Upstream also defines build_b37/build_hg38 (reference builders) and
+# pull_zenodo (data pull); those utilities are not ported (reference-data
+# heavy, no mini fixture) — documented in README.
 
 [workflow]
 name = "oxo-flow-clindet"
 version = "1.0.0"
-description = "Clinical WES pipeline ported from zyllifeworld/clindet (default paired WES path)"
+description = "Clinical WES/WGS/RNA pipeline ported from zyllifeworld/clindet (single entry, run_type dispatch — upstream Snakefile form)"
 author = "oxo-flow-community"
 pairs_file = "samplesheet.csv"
 format_version = "1.0"
@@ -16,13 +26,14 @@ format_version = "1.0"
 # Project / genome (upstream: config['project'] + config['genome_version'])
 # ---------------------------------------------------------------------------
 [config]
+# Upstream Snakefile dispatch key (VALID_RUN_TYPES): wes | wgs | rna
+run_type = "wes"
 output_dir = "mini_test"
 genome_version = "hg38_chr21"
-# run-type switch: WES rules (CollectHsMetrics etc.) gate on !wgs_mode;
-# the WGS workflow sets true and runs CollectWgsMetrics instead
-wgs_mode = false
 
-# Reads (upstream samplesheet columns Tumor_R1_file_path / Normal_R1_file_path ...)
+# Reads (upstream samplesheet columns Tumor_R1_file_path / Normal_R1_file_path
+# ...). The sample-sheet pairs (pairs_file above) drive {pair_id}/{experiment}/
+# {control} fan-out; these config paths are the fixture FASTQ locations.
 tumor_fastq_r1 = "test/fixtures/reads/mini-T_R1.fq.gz"
 tumor_fastq_r2 = "test/fixtures/reads/mini-T_R2.fq.gz"
 normal_fastq_r1 = "test/fixtures/reads/mini-NC_R1.fq.gz"
@@ -43,6 +54,7 @@ mutect2_vcf = "test/fixtures/refs/annotations/gnomAD.r2.1.1.GRCh38.PASS.AC.AF.on
 mutect2_germline_vcf = "test/fixtures/refs/annotations/gnomAD.r2.1.1.GRCh38.PASS.AC.AF.only_chr21.vcf.gz"
 # Upstream hg38_chr21 has no panel of normals (WES_PON: null) — leave empty
 wes_pon = ""
+wgs_pon = ""
 
 # BQSR (upstream config['project']['recal_BQSR'] + resources['varanno'][genome]):
 # recal_bqsr = false is the upstream mini-test default (recal_link symlinks the
@@ -54,6 +66,10 @@ known_sites2 = "test/fixtures/refs/annotations/known_sites2.mini.vcf.gz"
 # Caller lists (upstream run_params)
 somatic_caller_list = ["HaplotypeCaller", "vardict", "varscan2", "muse", "Mutect2"]
 germ_caller_list = ["strelkamanta", "caveman"]
+# Tumor-only callers (upstream run_params.tumor_only_caller; upstream default
+# is [sage] — needs the custom hmftools container, so the port defaults to
+# the seven portable callers, see rules/70_unpaired.oxoflow)
+unpaired_caller_list = ["Mutect2", "HaplotypeCaller", "varscan2", "strelka", "vardict", "lofreq", "freebayes"]
 
 # CNV branch (upstream somatic_cnv_list; mini-test default = [] -> off).
 # Set true to run the ported subset (freec/sequenza/exomedepth/ASCAT —
@@ -95,11 +111,44 @@ run_report = true
 # softwares_params[genome].annotate_beds dict (empty = header-only, no flags)
 annotate_beds_file = ""
 
-# Engine-injected list of pair ids (used by expand_inputs gather rules)
-pair_ids = ["mini"]
+# ---------------------------------------------------------------------------
+# RNA (upstream wrapper/rna.smk; run_type = "rna"). Default stages:
+# [arriba, call_mut]; quant/isofox rules run when explicitly targeted.
+# ---------------------------------------------------------------------------
+rna_fastq_r1 = "test/fixtures/reads/mini-T_RNA_R1.fq.gz"
+rna_fastq_r2 = "test/fixtures/reads/mini-T_RNA_R2.fq.gz"
+rna_gtf = "test/fixtures/refs/annotations/mini_chr21.gtf"
+# STAR index built inline by STAR_1_pass when missing (upstream ships a
+# pre-built index; the synthetic fixture reference needs its own)
+star_index = "test/fixtures/refs/star_index"
+# Quant indexes are empty in the upstream hg38_chr21 test config — the
+# RSEM/kallisto/salmon rules only run when explicitly targeted
+rsem_index = ""
+kallisto_index = ""
+salmon_index = ""
+# TRUST4 (upstream softwares_params[genome].trust4; git-cloned at rule
+# runtime into trust4_dir when trust4_f is missing — not in default stages)
+trust4_dir = "resources/softwares/TRUST4"
+trust4_ref = "resources/softwares/TRUST4/human_IMGT+C.fa"
+trust4_f = "resources/softwares/TRUST4/hg38_bcrtcr.fa"
+# Arriba databases (upstream softwares_params[genome].arriba.database).
+# Mini-test: blacklist + mini known_fusions/protein_domains/cytobands are
+# local files matching the 922 bp fixture reference (the whole-genome DBs
+# in the uhrigs/arriba:2.4.0 image fail to parse against it, observed live).
+# Real hg38 runs keep the container paths; the mini DBs mirror the formats 1:1.
+arriba_blacklist = "test/fixtures/refs/annotations/arriba_blacklist.tsv"
+arriba_known_fusions = "test/fixtures/refs/annotations/arriba_known_fusions_mini.tsv.gz"
+arriba_protein_domains = "test/fixtures/refs/annotations/arriba_protein_domains_mini.gff3"
+arriba_cytobands = "test/fixtures/refs/annotations/arriba_cytobands_mini.tsv"
+# HMF tools (isofox; excluded for hg38_chr21 upstream — needs the multi-GB
+# hmf_pipeline_resources tree, not shipped in the mini-test)
+hmftools_ensembl_data_dir = ""
+sage_ref_genome_version = "38"
+isofox_mem_mb = 30000
 
 # ---------------------------------------------------------------------------
-# Includes
+# Includes (every section is run_type/pairedness-gated at the rule level —
+# the merged DAG contains exactly the selected run type's rules)
 # ---------------------------------------------------------------------------
 [[include]]
 path = "rules/00_common.oxoflow"
@@ -126,44 +175,107 @@ path = "rules/50_merge.oxoflow"
 path = "rules/60_report.oxoflow"
 
 [[include]]
+path = "rules/70_unpaired.oxoflow"
+
+[[include]]
 path = "rules/80_cnv.oxoflow"
 
+[[include]]
+path = "rules/90_wgs.oxoflow"
+
+[[include]]
+path = "rules/91_wgs_callers.oxoflow"
+
+[[include]]
+path = "rules/rna/00_qc.oxoflow"
+
+[[include]]
+path = "rules/rna/10_mapping.oxoflow"
+
+[[include]]
+path = "rules/rna/20_fusion.oxoflow"
+
+[[include]]
+path = "rules/rna/30_isofox.oxoflow"
+
+[[include]]
+path = "rules/rna/40_call_mut.oxoflow"
+
+[[include]]
+path = "rules/rna/50_snv.oxoflow"
+
+[[include]]
+path = "rules/rna/60_vcf2maf_merge.oxoflow"
+
 # ---------------------------------------------------------------------------
-# Targets: merge_paired_vcf (upstream mini-test default stage call_mut_vcf,
-# ungated — no VEP needed) plus the VEP-gated `all` tail below (merged
-# somatic + germline MAF, flagged MAF, cancer report, MultiQC). The port
-# `all` additionally builds the germline MAF, mutation flagging and the two
-# reports vs upstream's [stages=call_mut_vcf] — see README Fidelity.
+# Targets (upstream wrapper rule all per run type):
+#   wes/wgs paired: all_vcf (merge_paired_vcf) + VEP-gated `all`
+#   wes unpaired:   all_unpaired + VEP-gated all_unpaired_maf
+#   wgs:            all_sv (per-caller SV outputs; the jasmine merge needs
+#                   the upstream's custom jasminesv container)
+#   CNV:            all_cnv (cnv_enabled gate)
 # ---------------------------------------------------------------------------
 [[rules]]
 name = "all_vcf"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf", variables = { pair_id = "config.pair_ids" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf", variables = { pair_id = "{pair_id}" } }
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all_vcf.done"]
+when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
 shell = "touch {output[0]}"
 
 [[rules]]
 name = "all_cnv"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/{pair_id}-T.bam_ratio.txt.png", variables = { pair_id = "config.pair_ids" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_segments.txt", variables = { pair_id = "config.pair_ids" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/exomedepth/{pair_id}/{pair_id}_exomedepth.tsv", variables = { pair_id = "config.pair_ids" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_purity.ploidy.tsv", variables = { pair_id = "config.pair_ids" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/{pair_id}-T.bam_ratio.txt.png", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_segments.txt", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/exomedepth/{pair_id}/{pair_id}_exomedepth.tsv", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_purity.ploidy.tsv", variables = { pair_id = "{pair_id}" } }
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all_cnv.done"]
-when = "config.cnv_enabled"
+when = "config.cnv_enabled && ((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs')"
+shell = "touch {output[0]}"
+
+[[rules]]
+name = "all_sv"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter_bnd.vcf", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_germ.vcf", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.sv.vcf", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/Manta/results/variants/somaticSV.vcf.gz", variables = { pair_id = "{pair_id}" } }
+]
+output = ["{config.output_dir}/{config.genome_version}/results/all_sv.done"]
+when = "config.run_type == 'wgs' && wildcard.control != ''"
 shell = "touch {output[0]}"
 
 [[rules]]
 name = "all"
 expand_inputs = [
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "config.pair_ids" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "config.pair_ids" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.maf", variables = { pair_id = "config.pair_ids" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html", variables = { pair_id = "config.pair_ids" } },
-    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_report.html", variables = { pair_id = "config.pair_ids" } }
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf_germline/paired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/paired/{pair_id}/anno/{pair_id}.maf", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_report.html", variables = { pair_id = "{pair_id}" } }
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all.done"]
+when = "config.vep_cache_ready && ((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs')"
 shell = "touch {output[0]}"
-when = "config.vep_cache_ready"
+
+[[rules]]
+name = "all_unpaired"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/recal/unpaired/{pair_id}-T.bam", variables = { pair_id = "{pair_id}" } },
+    { pattern = "{config.output_dir}/{config.genome_version}/results/vcf/unpaired/{pair_id}/merge/{pair_id}.vcf", variables = { pair_id = "{pair_id}" } }
+]
+output = ["{config.output_dir}/{config.genome_version}/results/unpaired_all.done"]
+when = "config.run_type == 'wes' && wildcard.control == ''"
+shell = "touch {output[0]}"
+
+[[rules]]
+name = "all_unpaired_maf"
+expand_inputs = [
+    { pattern = "{config.output_dir}/{config.genome_version}/results/maf/unpaired/{pair_id}/merge/{pair_id}.maf", variables = { pair_id = "{pair_id}" } }
+]
+output = ["{config.output_dir}/{config.genome_version}/results/unpaired_all_maf.done"]
+when = "config.vep_cache_ready && (config.run_type == 'wes' && wildcard.control == '')"
+shell = "touch {output[0]}"

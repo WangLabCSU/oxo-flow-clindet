@@ -30,6 +30,7 @@ name = "rna_fusion"
 # -------------------------------------------------------------- arriba ------
 [[rules]]
 name = "arriba_fusion"
+when = "config.run_type == 'rna'"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}.sorted.bam",
     stamp = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_star.log"
@@ -43,6 +44,7 @@ singularity = "docker://uhrigs/arriba:2.4.0"
 
 [[rules]]
 name = "arriba_draw"
+when = "config.run_type == 'rna'"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.sorted.bam",
     stamp = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_star.log",
@@ -58,6 +60,7 @@ singularity = "docker://uhrigs/arriba:2.4.0"
 # -------------------------------------------------------------- TRUST4 ------
 [[rules]]
 name = "TRUST4_TBCR"
+when = "config.run_type == 'rna'"
 input = {
     bam = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}.sorted.bam",
     stamp = "{config.output_dir}/{config.genome_version}/results/mapped/STAR/{pair_id}/{pair_id}_star.log"

@@ -17,20 +17,20 @@ TARGETS=(
 )
 
 echo "==> validate"
-"$OXO" validate main_rna.oxoflow
+"$OXO" validate main.oxoflow --arg run_type=rna
 
 echo "==> lint (warnings are acceptable, errors are not)"
-"$OXO" lint main_rna.oxoflow
+"$OXO" lint main.oxoflow --arg run_type=rna
 
 echo "==> dry-run with the upstream default stages"
-"$OXO" dry-run main_rna.oxoflow "${TARGETS[@]}" > /tmp/oxo-dryrun-rna-$$.txt 2>&1
+"$OXO" dry-run main.oxoflow --arg run_type=rna "${TARGETS[@]}" > /tmp/oxo-dryrun-rna-$$.txt 2>&1
 grep -q "would execute" /tmp/oxo-dryrun-rna-$$.txt
 
 echo "==> debug: expanded commands contain no literal {config./{pair_id}/{input. placeholders"
 # {input.NAME} with a POSITIONAL input array never expands (hit live:
 # varscan got the literal path and hung on stdin); {config. and {pair_id}
 # are the engine-injected keys.
-if "$OXO" debug main_rna.oxoflow "${TARGETS[@]}" 2>&1 | grep -E '\{config\.|\{pair_id\}|\{input\.' > /dev/null; then
+if "$OXO" debug main.oxoflow --arg run_type=rna "${TARGETS[@]}" 2>&1 | grep -E '\{config\.|\{pair_id\}|\{input\.' > /dev/null; then
   echo "unexpanded wildcards in debug output"
   exit 1
 fi

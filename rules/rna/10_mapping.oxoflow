@@ -36,6 +36,7 @@ name = "rna_mapping"
 # ----------------------------------------------------------- STAR 1-pass ----
 [[rules]]
 name = "STAR_1_pass"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}",
@@ -74,6 +75,7 @@ conda = "envs/rsem.yaml"
 # ---------------------------------------------------- STAR 2-pass (arriba) ----
 [[rules]]
 name = "STAR_arriba_map"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}",
@@ -99,6 +101,7 @@ conda = "envs/rsem.yaml"
 # ------------------------------------------------- STAR re-align (mutation) ----
 [[rules]]
 name = "STAR_mut_map"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}",
@@ -125,6 +128,7 @@ conda = "envs/rsem.yaml"
 # ------------------------------------------------------------ RSEM quant ----
 [[rules]]
 name = "cal_exp_RSEM"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}"
@@ -144,6 +148,7 @@ conda = "envs/rsem.yaml"
 
 [[rules]]
 name = "RSEM_sort_genome"
+when = "config.run_type == 'rna'"
 input = [ "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.bam" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/summary/RSEM/{pair_id}/{pair_id}.STAR.genome.sorted.bam" ]
 resources = { threads = 10 }
@@ -156,6 +161,7 @@ conda = "envs/rsem.yaml"
 # ------------------------------------------------------- kallisto / salmon ----
 [[rules]]
 name = "kallisto"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}"
@@ -169,6 +175,7 @@ conda = "envs/rsem.yaml"
 
 [[rules]]
 name = "salmon"
+when = "config.run_type == 'rna'"
 input = {
     R1 = "{config.rna_fastq_r1}",
     R2 = "{config.rna_fastq_r2}"

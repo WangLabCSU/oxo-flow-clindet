@@ -8,6 +8,7 @@ name = "germline"
 # ------------------------------------------------------------------ Manta ----
 [[rules]]
 name = "call_config_strelka"
+when = "config.run_type == 'wes' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -33,6 +34,7 @@ conda = "envs/strelka.yaml"
 # ------------------------------------------------------- Strelka2 (germline) ----
 [[rules]]
 name = "call_strelka_manta_germline"
+when = "config.run_type == 'wes' && wildcard.control != ''"
 input = {
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
     ref = "{config.reference}",
@@ -61,6 +63,7 @@ conda = "envs/strelka.yaml"
 # port merges that one file (documented in README Fidelity).
 [[rules]]
 name = "merge_strelka_manta"
+when = "config.run_type == 'wes' && wildcard.control != ''"
 input = [ "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaManta/results/variants/variants.vcf.gz" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/vcf_germline/paired/{pair_id}/strelkamanta.vcf" ]
 description = "merge Strelka2 germline variants + rename TUMOR/NORMAL sample ids"
@@ -73,6 +76,7 @@ conda = "envs/clindet.yaml"
 # ------------------------------------------- Strelka2 somatic (Manta-driven) ----
 [[rules]]
 name = "call_strelka_somatic_manta"
+when = "config.run_type == 'wes' && wildcard.control != ''"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -100,6 +104,7 @@ conda = "envs/strelka.yaml"
 
 [[rules]]
 name = "merge_strelka_somatic_manta"
+when = "config.run_type == 'wes' && wildcard.control != ''"
 input = [
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.snvs.vcf.gz",
     "{config.output_dir}/{config.genome_version}/results/vcf/paired/{pair_id}/StrelkaSomaticManta/results/variants/somatic.indels.vcf.gz"
