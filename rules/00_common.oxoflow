@@ -142,7 +142,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam.bai"
 }
 description = "symlink tumor dedup BAM to recal path when recal_BQSR=False"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (!config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (!config.recal_bqsr)"
 shell = """ln -sfn $(realpath {input.bam}) {output.bam}
 ln -sfn $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
@@ -159,7 +159,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam.bai"
 }
 description = "symlink normal dedup BAM to recal path when recal_BQSR=False"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (!config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (!config.recal_bqsr)"
 shell = """ln -sfn $(realpath {input.bam}) {output.bam}
 ln -sfn $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
@@ -180,7 +180,7 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.grp" ]
 description = "gatk BaseRecalibrator on tumor (upstream recalibrate_base_qualities)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && [ -f {input.known_1}.tbi ] || gatk IndexFeatureFile -I {input.known_1}
 [ -f {input.known_2}.tbi ] || gatk IndexFeatureFile -I {input.known_2}
 gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
@@ -197,7 +197,7 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.grp" ]
 description = "gatk BaseRecalibrator on normal (upstream recalibrate_base_qualities)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && [ -f {input.known_1}.tbi ] || gatk IndexFeatureFile -I {input.known_1}
 [ -f {input.known_2}.tbi ] || gatk IndexFeatureFile -I {input.known_2}
 gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
@@ -216,7 +216,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam.bai"
 }
 description = "gatk ApplyBQSR + samtools index on tumor (upstream apply_base_quality_recalibration)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
 gatk BuildBamIndex -I {output.bam}
 mv "$(echo {output.bam} | sed 's/[.]bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""
@@ -235,7 +235,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam.bai"
 }
 description = "gatk ApplyBQSR + samtools index on normal (upstream apply_base_quality_recalibration)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
 gatk BuildBamIndex -I {output.bam}
 mv "$(echo {output.bam} | sed 's/[.]bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""

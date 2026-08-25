@@ -55,7 +55,7 @@ input = {
 output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/{pair_id}_config_freec.ini" ]
 resources = { threads = 10 }
 description = "write per-sample Control-FREEC config (upstream freec_config + config_freec.py; threads = upstream rule threads, sets SambambaThreads)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """python3 scripts/smk.py --script scripts/config_freec.py --input Tum {input.Tum} --input NC {input.NC} --input ini_template {input.ini_template} --param chrLenFile {config.freec_chr_len_file} --param chrFiles {config.freec_chr_files} --param bed {config.target_bed} --param sambamba {config.freec_sambamba} --param maxThreads 6 --param outputDir {config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id} --param ref {config.reference} --output config {output[0]} --threads {threads}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
@@ -70,7 +70,7 @@ output = [
 ]
 resources = { threads = 6 }
 description = "Control-FREEC call (upstream freec_call_paired; upstream runs freec in the facets-suite container, the port uses the bioconda control-freec build)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """freec -conf {input[0]} || {
     # Mini-fixture accommodation (documented): the 900 bp chr21 reference
     # with its 2-region capture is below Control-FREEC's working scale
@@ -95,7 +95,7 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/{pair_id}-T.bam_ratio.txt.png" ]
 description = "makeGraph2.0.R ratio plot (upstream plot_freec; makeGraph2.0.R ships with bioconda control-freec under share/; stub png when the call fell back)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """if [ -f {config.output_dir}/{config.genome_version}/results/cnv/paired/freec/{pair_id}/.freec_fallback_note ]; then
     echo "plot_freec: freec mini-fallback — stub png" >&2
     printf 'mini-fixture fallback plot\n' > {output[0]}
@@ -119,7 +119,7 @@ input = {
 output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}.seqz.gz" ]
 resources = { threads = 8 }
 description = "sequenza-utils bam2seqz (upstream sequenza_bam2seqz)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """sequenza-utils bam2seqz --normal {input.NC} --tumor {input.Tum} --fasta {input.ref} -gc {input.gc} --output {output[0]}"""
 [rules.environment]
 conda = "envs/sequenza.yaml"
@@ -129,7 +129,7 @@ name = "sequenza_seqz_binning"
 input = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}.seqz.gz" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_bin50.seqz.gz" ]
 description = "sequenza-utils seqz_binning -w 50 (upstream sequenza_seqz_binning)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """sequenza-utils seqz_binning -w 50 --seqz {input[0]} -o {output[0]}"""
 [rules.environment]
 conda = "envs/sequenza.yaml"
@@ -139,7 +139,7 @@ name = "sequenza_call"
 input = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_bin50.seqz.gz" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id}/{pair_id}_segments.txt" ]
 description = "sequenza fit + results (upstream sequenza_call; upstream's referenced sequenza.R does not exist — port ships scripts/sequenza_call.R)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """Rscript scripts/smk.R --script scripts/sequenza_call.R --input bin_seqz {input[0]} --param wd {config.output_dir}/{config.genome_version}/results/cnv/paired/sequenza/{pair_id} --output segment {output[0]}"""
 [rules.environment]
 conda = "envs/sequenza_r.yaml"
@@ -159,7 +159,7 @@ output = {
 }
 resources = { threads = 8 }
 description = "ExomeDepth somatic CNV call (upstream CNA_exomedepth + ExomeDepth.R)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """if [ "{config.exomedepth_use_target_bed}" = "true" ]; then UB=TRUE; else UB=FALSE; fi
 Rscript scripts/smk.R --script scripts/exomedepth.R --input Tum {input.Tum} --input NC {input.NC} --input bed {input.bed} --input ref {input.ref} --param wd {config.output_dir}/{config.genome_version}/results/cnv/paired/exomedepth/{pair_id} --param sample_index {pair_id} --param use_target_bed $UB --output rds {output.rds} --output tsv {output.tsv} --wildcard genome_version {config.genome_version} --threads {threads}"""
 [rules.environment]
@@ -175,7 +175,7 @@ input = {
 output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_ASCAT.rdata" ]
 resources = { threads = 8 }
 description = "ASCAT prepareHTS + loadData + correctLogR + aspcf + runAscat (upstream CNA_ASCAT + ASCAT.R; chroms/GC/rt from config, see header)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """Rscript scripts/smk.R --script scripts/ascat.R --input Tum {input.Tum} --input NC {input.NC} --param wd {config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id} --param lociprefix {config.ascat_loci_prefix} --param allelesprefix {config.ascat_alleles_prefix} --param GCcontentfile {config.ascat_gc_file} --param replictimingfile {config.ascat_rt_file} --param chroms {config.ascat_chroms} --param sample_name {pair_id} --output rdata {output[0]} --wildcard genome_version {config.genome_version} --threads {threads}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
@@ -185,7 +185,7 @@ name = "ASCAT_EXTRACT_PURITYPLOIDY"
 input = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_ASCAT.rdata" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_purity.ploidy.tsv" ]
 description = "write ASCAT purity/ploidy tsv (upstream ASCAT_EXTRACT_PURITYPLOIDY + ascat_pp.R)"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs' && (config.cnv_enabled)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.cnv_enabled)"
 shell = """Rscript scripts/smk.R --script scripts/ascat_pp.R --input rdata {input[0]} --output tsv {output[0]}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
