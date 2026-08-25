@@ -10,7 +10,7 @@ name = "caveman"
 # so the else-branch applies: empty CNV beds + blanket copy number (-td 2 -nd 2).
 [[rules]]
 name = "CM_cnv"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam"
@@ -25,7 +25,7 @@ touch {output[1]}"""
 
 [[rules]]
 name = "CM_call"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -47,7 +47,7 @@ singularity = "docker://quay.io/wtsicgp/cgpcavemanwrapper:1.15.3"
 
 [[rules]]
 name = "CM_flag"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",
@@ -64,7 +64,7 @@ singularity = "docker://quay.io/wtsicgp/cgpcavemanwrapper:1.15.3"
 
 [[rules]]
 name = "CM_germ_flag"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = {
     Tum = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam",
     NC = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam",

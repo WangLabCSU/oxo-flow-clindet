@@ -13,7 +13,7 @@ name = "common"
 # ---------------------------------------------------------------- fastp ----
 [[rules]]
 name = "fastp_tumor_sample"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = { R1 = "{config.tumor_fastq_r1}", R2 = "{config.tumor_fastq_r2}" }
 output = [
     "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R1.fastq.gz",
@@ -29,7 +29,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "fastp_normal_sample"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = { R1 = "{config.normal_fastq_r1}", R2 = "{config.normal_fastq_r2}" }
 output = [
     "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-NC_R1.fastq.gz",
@@ -46,7 +46,7 @@ conda = "envs/clindet.yaml"
 # ----------------------------------------------------------- bam flagstat ----
 [[rules]]
 name = "bam_flagstat_tumor"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T.bam.flagstat" ]
 resources = { threads = 10 }
@@ -57,7 +57,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "bam_flagstat_normal"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC.bam.flagstat" ]
 resources = { threads = 10 }
@@ -69,7 +69,7 @@ conda = "envs/clindet.yaml"
 # --------------------------------------------------------------- mapping ----
 [[rules]]
 name = "map_reads_tumor"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = {
     R1 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R1.fastq.gz",
     R2 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-T_R2.fastq.gz"
@@ -85,7 +85,7 @@ conda = "envs/clindet.yaml"
 
 [[rules]]
 name = "map_reads_normal"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = {
     R1 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-NC_R1.fastq.gz",
     R2 = "{config.output_dir}/{config.genome_version}/results/trimmed/{pair_id}-NC_R2.fastq.gz"
@@ -102,7 +102,7 @@ conda = "envs/clindet.yaml"
 # -------------------------------------------------------- mark duplicates ----
 [[rules]]
 name = "mark_duplicates_tumor"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-T.sorted.bam" ]
 output = {
     bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-T.sorted.bam",
@@ -116,7 +116,7 @@ singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py31
 
 [[rules]]
 name = "mark_duplicates_normal"
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 input = [ "{config.output_dir}/{config.genome_version}/results/mapped/paired/{pair_id}-NC.sorted.bam" ]
 output = {
     bam = "{config.output_dir}/{config.genome_version}/results/dedup/paired/{pair_id}-NC.sorted.bam",
@@ -142,7 +142,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam.bai"
 }
 description = "symlink tumor dedup BAM to recal path when recal_BQSR=False"
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (!config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (!config.recal_bqsr)"
 shell = """ln -sfn $(realpath {input.bam}) {output.bam}
 ln -sfn $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
@@ -159,7 +159,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam.bai"
 }
 description = "symlink normal dedup BAM to recal path when recal_BQSR=False"
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (!config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (!config.recal_bqsr)"
 shell = """ln -sfn $(realpath {input.bam}) {output.bam}
 ln -sfn $(realpath {input.bai}) {output.bai}"""
 [rules.environment]
@@ -180,7 +180,7 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.grp" ]
 description = "gatk BaseRecalibrator on tumor (upstream recalibrate_base_qualities)"
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && [ -f {input.known_1}.tbi ] || gatk IndexFeatureFile -I {input.known_1}
 [ -f {input.known_2}.tbi ] || gatk IndexFeatureFile -I {input.known_2}
 gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
@@ -197,7 +197,7 @@ input = {
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.grp" ]
 description = "gatk BaseRecalibrator on normal (upstream recalibrate_base_qualities)"
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && [ -f {input.known_1}.tbi ] || gatk IndexFeatureFile -I {input.known_1}
 [ -f {input.known_2}.tbi ] || gatk IndexFeatureFile -I {input.known_2}
 gatk BaseRecalibrator --use-original-qualities -R {input.ref} -I {input.bam} -O {output[0]} --known-sites {input.known_1} --known-sites {input.known_2}"""
@@ -216,7 +216,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-T.bam.bai"
 }
 description = "gatk ApplyBQSR + samtools index on tumor (upstream apply_base_quality_recalibration)"
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
 gatk BuildBamIndex -I {output.bam}
 mv "$(echo {output.bam} | sed 's/[.]bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""
@@ -235,7 +235,7 @@ output = {
     bai = "{config.output_dir}/{config.genome_version}/results/recal/paired/{pair_id}-NC.bam.bai"
 }
 description = "gatk ApplyBQSR + samtools index on normal (upstream apply_base_quality_recalibration)"
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.recal_bqsr)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.recal_bqsr)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk ApplyBQSR --add-output-sam-program-record -use-original-qualities --bqsr-recal-file {input.recal_table} -R {input.ref} -I {input.bam} -O {output.bam}
 gatk BuildBamIndex -I {output.bam}
 mv "$(echo {output.bam} | sed 's/[.]bam$/.bai/')" {output.bai} # BuildBamIndex writes <bam-stem>.bai (samtools-style .bam.bai is the declared output)"""

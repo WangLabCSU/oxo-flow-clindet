@@ -221,7 +221,7 @@ expand_inputs = [
     { pattern = "{config.output_dir}/{config.genome_version}/results/vcf_norm/paired/{pair_id}/merge/{pair_id}.vcf", variables = {} }
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all_vcf_{pair_id}.done"]
-when = "(config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs'"
+when = "(config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')"
 shell = "touch {output[0]}"
 
 [[rules]]
@@ -233,7 +233,7 @@ expand_inputs = [
     { pattern = "{config.output_dir}/{config.genome_version}/results/cnv/paired/ascat/{pair_id}/{pair_id}_purity.ploidy.tsv", variables = {} }
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all_cnv_{pair_id}.done"]
-when = "config.cnv_enabled && ((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs')"
+when = "config.cnv_enabled && ((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != ''))"
 shell = "touch {output[0]}"
 
 [[rules]]
@@ -258,7 +258,7 @@ expand_inputs = [
     { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_report.html", variables = {} }
 ]
 output = ["{config.output_dir}/{config.genome_version}/results/all_{pair_id}.done"]
-when = "config.vep_cache_ready && ((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs')"
+when = "config.vep_cache_ready && ((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != ''))"
 shell = "touch {output[0]}"
 
 [[rules]]

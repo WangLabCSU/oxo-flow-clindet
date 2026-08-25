@@ -17,7 +17,7 @@ input = {
     rmd_file = "report/main.Rmd"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/report/{pair_id}/{pair_id}_cancer_report.html" ]
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.run_report && config.vep_cache_ready)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.run_report && config.vep_cache_ready)"
 resources = { memory = "10000M" }
 description = "render the clindet case report (upstream run_cancer_report + rmd.R)"
 shell = """Rscript scripts/smk.R --script scripts/rmd.R --param report_rmd {input.rmd_file} --param output_file {output[0]} --param af_keygenes {input.af_keygenes} --param genome_version {config.genome_version} --param tumor_name {pair_id} --param somatic_mut_maf {input.somatic_mut_maf}"""
@@ -36,7 +36,7 @@ input = {
     picard = "{config.output_dir}/{config.genome_version}/results/stats/paired/wes_metrics/{pair_id}-T.txt"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt" ]
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.run_report)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.run_report)"
 description = "collect QC files for MultiQC (upstream prep_multiqc_data, in-scope subset)"
 shell = """printf '%s\\n' "{input.fastp_tum}" "{input.fastp_nc}" "{input.dedup_metrics}" "{input.picard}" > {output[0]}"""
 [rules.environment]
@@ -48,7 +48,7 @@ expand_inputs = [
     { pattern = "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt", variables = { pair_id = "config.pairs_list" } }
 ]
 output = [ "{config.output_dir}/{config.genome_version}/results/multiqc/filelist.txt" ]
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.run_report)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.run_report)"
 description = "merge per-sample filelists into one (upstream combined_multiqc_prep_multiqc_data)"
 shell = """cat {input} | sort -u > {output[0]}"""
 [rules.environment]
@@ -58,7 +58,7 @@ conda = "envs/clindet.yaml"
 name = "combined_multiqc"
 input = [ "{config.output_dir}/{config.genome_version}/results/multiqc/filelist.txt" ]
 output = [ "{config.output_dir}/{config.genome_version}/results/multiqc_report.html" ]
-when = "((config.run_type == 'wes' && wildcard.control != '') || config.run_type == 'wgs') && (config.run_report)"
+when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.run_report)"
 description = "run MultiQC on the filelist (upstream combined_multiqc)"
 shell = """multiqc -f -o . -l {input[0]} --filename {output[0]}"""
 [rules.environment]
