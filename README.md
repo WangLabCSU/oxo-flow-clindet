@@ -212,11 +212,16 @@ bash test/run_rna.sh  # RNA: validate + lint + dry-run (default stages), exits 0
 | wes tumor-only (control empty) | ✅ live-verified ×2 | 7 tumor-only callers + merge |
 | wgs | ✅ live-verified | WGS metrics, delly SV chain (incl. germ), svaba, Manta somaticSV, MuSE/Strelka2 WGS configs |
 | rna | ✅ live-verified | arriba/TRUST4/isofox default stages |
+| **merged single-entry: wes** | ✅ live-verified (PR #187) | one DAG, both sheet rows — paired mini + tumor-only mini2, per-pair morphing + per-instance expand_inputs binding |
+| **merged single-entry: wgs** | ✅ live-verified (PR #187) | paired-only WGS tree (unpaired rows do not instantiate in WGS, upstream semantics) |
+| **merged single-entry: rna** | ✅ live-verified (PR #187) | default stages via prefix `-t` targets; docker-hub arriba image pulled through the box mirror (`OXO_REGISTRY_MIRRORS`) |
 
-The four entries above were live-verified as separate entry files; the
-merged single-entry form (run_type dispatch + per-pair paired/unpaired
-derivation, engine PR #187) passes validate + dry-run on all run types and
-its live re-verification runs on tx-ubuntu with the PR #187 engine.
+The first four entries were live-verified as separate entry files; the
+merged single-entry rows were live-verified on tx-ubuntu with the PR #187
+engine (wildcard-scoped `when` + per-instance pair binding). The vcf2maf/
+VEP chain is gated on `vep_cache_ready` and was live-verified in the
+4-entry era; the merged-form pass covers the same rules (identical
+commands) once the VEP cache is present.
 
 Mini-fixture degeneracy (900 bp chr21 + 20 kb chrX) is handled with
 documented fallbacks where a tool needs real signal (ExomeDepth/ASCAT/
