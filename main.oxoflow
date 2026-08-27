@@ -71,10 +71,10 @@ germ_caller_list = ["strelkamanta", "caveman"]
 # the seven portable callers, see rules/70_unpaired.oxoflow)
 unpaired_caller_list = ["Mutect2", "HaplotypeCaller", "varscan2", "strelka", "vardict", "lofreq", "freebayes"]
 
-# CNV branch (upstream somatic_cnv_list; mini-test default = [] -> off).
-# Set true to run the ported subset (freec/sequenza/exomedepth/ASCAT —
-# purple/amber/cobalt/facets need the upstream's custom containers, see
-# rules/80_cnv.oxoflow).
+# CNV branch (upstream somatic_cnv_list; mini-test default = [notrun]
+# sentinel -> off). Set true to run the ported subset
+# (freec/sequenza/exomedepth/ASCAT — purple/amber/cobalt/facets need the
+# upstream's custom containers, see rules/80_cnv.oxoflow).
 cnv_enabled = false
 freec_ini_template = "scripts/config_exome.mini.ini"
 freec_chr_len_file = "test/fixtures/cnv/freec_chrlen.txt"

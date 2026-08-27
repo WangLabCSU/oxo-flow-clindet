@@ -16,12 +16,15 @@ jobs:
 
       # The merged single-entry workflow needs wildcard-scoped `when`
       # (Traitome/oxo-flow#187) and per-instance expand_inputs binding —
-      # not yet in the latest release, so build the engine from main.
-      - name: Install oxo-flow (main, cargo)
+      # first shipped in v0.16.0 (2026-08-27), the documented engine floor.
+      - name: Install oxo-flow (v0.16.0, cargo)
         run: |
-          cargo install --git https://github.com/Traitome/oxo-flow oxo-flow-cli --locked --quiet
+          cargo install --git https://github.com/Traitome/oxo-flow oxo-flow-cli --tag v0.16.0 --locked --quiet
           oxo-flow --version
 
-      # run.sh covers the run_type loop (default-wes / wgs / rna dry-runs).
+      # run.sh covers the run_type loop (default-wes / wgs / rna dry-runs);
+      # run_rna.sh adds the RNA default-stage targeted dry-run.
       - name: Validate, lint, dry-run
-        run: bash ./test/run.sh
+        run: |
+          bash ./test/run.sh
+          bash ./test/run_rna.sh

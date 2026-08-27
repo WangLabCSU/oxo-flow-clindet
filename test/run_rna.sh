@@ -16,23 +16,17 @@ TARGETS=(
   -t varscan2 -t norm_filter
 )
 
+# validate/lint/debug are static structure checks and do not accept --arg
+# or -t (run_type-gated behavior is exercised by the targeted dry-run below;
+# run.sh covers the same wildcard-placeholder check for the default WES).
 echo "==> validate"
-"$OXO" validate main.oxoflow --arg run_type=rna
+"$OXO" validate main.oxoflow
 
 echo "==> lint (warnings are acceptable, errors are not)"
-"$OXO" lint main.oxoflow --arg run_type=rna
+"$OXO" lint main.oxoflow
 
 echo "==> dry-run with the upstream default stages"
 "$OXO" dry-run main.oxoflow --arg run_type=rna "${TARGETS[@]}" > /tmp/oxo-dryrun-rna-$$.txt 2>&1
 grep -q "would execute" /tmp/oxo-dryrun-rna-$$.txt
-
-echo "==> debug: expanded commands contain no literal {config./{pair_id}/{input. placeholders"
-# {input.NAME} with a POSITIONAL input array never expands (hit live:
-# varscan got the literal path and hung on stdin); {config. and {pair_id}
-# are the engine-injected keys.
-if "$OXO" debug main.oxoflow --arg run_type=rna "${TARGETS[@]}" 2>&1 | grep -E '\{config\.|\{pair_id\}|\{input\.' > /dev/null; then
-  echo "unexpanded wildcards in debug output"
-  exit 1
-fi
 
 echo "PASS"

@@ -1,4 +1,4 @@
-# oxo-flow-clindet — Clinical WES tumor/normal variant calling
+# oxo-flow-clindet — Cancer genome & transcriptome analysis (WES/WGS/RNA): somatic+germline+CNV+SV calling, MAF annotation, case report
 
 [![CI](https://github.com/WangLabCSU/oxo-flow-clindet/actions/workflows/ci.yml/badge.svg)](https://github.com/WangLabCSU/oxo-flow-clindet/actions/workflows/ci.yml)
 
@@ -16,7 +16,10 @@ mutation flagging → cancer case report (Rmd/knitr) and MultiQC.
 
 ### 1. Install oxo-flow
 
-Requires **oxo-flow ≥ 0.12.0**. Release binary (recommended):
+Requires **oxo-flow ≥ 0.16.0** — the first release with the
+wildcard-scoped `when` predicates + per-instance pair binding this
+single-entry form needs (Traitome/oxo-flow PR #187). Release binary
+(recommended):
 
 ```bash
 curl -fL -o oxo-flow.tar.gz \
@@ -86,8 +89,8 @@ mini fixture; not ported (documented).
 
 The samplesheet (`samplesheet.csv`) holds one row per pair:
 `pair_id,experiment,control,experiment_type` — leave `control` empty for a
-tumor-only pair. Requires oxo-flow with wildcard-scoped `when` predicates
-(`wildcard.<key>`, Traitome/oxo-flow PR #187).
+tumor-only pair. Requires oxo-flow ≥ 0.16.0 (wildcard-scoped `when`
+predicates, `wildcard.<key>`, landed in v0.16.0 — Traitome/oxo-flow PR #187).
 
 ### RNA default stages (targeted)
 
@@ -187,6 +190,9 @@ does not ship non-human references.
   and WGS Battenberg/ecDNA/VirusScan: custom containers + resource trees
   as above.
 - conpair contamination check: custom conpair_latest.sif container.
+- unpaired CNV (upstream `rtm/unpaired/CNV.smk`: freec + purple): the
+  ported CNV branch is paired-only (upstream mini-test default
+  `somatic_cnv_list: [notrun]`).
 - non-human genomes: supported at config level (WBcel235/mm10 parity table
   above) — the upstream rule set itself is species-agnostic.
 
@@ -218,7 +224,8 @@ bash test/run_rna.sh  # RNA: validate + lint + dry-run (default stages), exits 0
 
 The first four entries were live-verified as separate entry files; the
 merged single-entry rows were live-verified on tx-ubuntu with the PR #187
-engine (wildcard-scoped `when` + per-instance pair binding). The vcf2maf/
+engine (wildcard-scoped `when` + per-instance pair binding — shipped as
+oxo-flow v0.16.0). The vcf2maf/
 VEP chain is gated on `vep_cache_ready` and was live-verified in the
 4-entry era; the merged-form pass covers the same rules (identical
 commands) once the VEP cache is present.
