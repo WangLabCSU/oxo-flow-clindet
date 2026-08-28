@@ -170,7 +170,9 @@ does not ship non-human references.
 | WGS callers (no exome restrictions) | `rules/91_wgs_callers.oxoflow` | gatk4/muse/varscan/vardict/strelka2/manta | no `--intervals`/`--callRegions`/`--exome`; Manta emits somaticSV; germline Strelka takes BOTH bams (WES: normal only); vardict regions from `vardict_wgs_bed` |
 | WGS picard_collect_wgs / picard_flength_wgs | `picard_collect_wgs_{tumor,normal}` / `picard_flength_wgs_{tumor,normal}` | picard | CollectWgsMetrics + CollectInsertSizeMetrics (telomerecat is "departed" upstream — not ported) |
 | SV_delly chain | `SV_delly` → `SV_delly_sample_tsv` → `SV_delly_filter_somatic` → `SV_delly_to_vcf` → `delly_filter` → `delly2bnd` | delly 1.7.2 (container), bcftools | verbatim; `delly2bnd.py` verbatim (upstream env lacks cyvcf2 — added to envs/clindet.yaml, upstream bug) |
-| SV_svaba | `SV_svaba` | svaba (container) | verbatim run; sansa/svanno annotation gates absent from the mini config — not ported |
+| SV_svaba | `SV_svaba` | svaba (container) | verbatim run |
+| sansa-annotation (svaba + delly) | `SV_sansa_anno_svaba` / `SV_sansa_annodelly` | site-provided sansa binary (`sansa_call`) | gated on `sansa_db`/`sansa_g` being set (upstream gates on the sansa software config being present — absent upstream by default, so off by default here too; zero instances without the keys) |
+| svanno (gatk SVAnnotate) | `SV_svanno_svaba` | gatk4 (container) | gated on `svanno_gtf` (protein-coding GTF); zero instances without the key |
 | Manta SV | `call_config_strelka` (WGS) | manta | `somaticSV.vcf.gz` from the WGS Manta run (upstream SV list entry 'Manta') |
 
 **Not ported** (upstream branches with reasons):

@@ -118,6 +118,18 @@ annotate_beds_file = ""
 rna_fastq_r1 = "test/fixtures/reads/mini-T_RNA_R1.fq.gz"
 rna_fastq_r2 = "test/fixtures/reads/mini-T_RNA_R2.fq.gz"
 rna_gtf = "test/fixtures/refs/annotations/mini_chr21.gtf"
+# SV annotation branch (issue #7; upstream WGS SV rules gate on the sansa
+# software config being present — absent upstream by default, so these are
+# off by default and the port mirrors that with empty keys = zero instances).
+# sansa_db/sansa_g: the sansa annotate -a database and -g gene-model inputs
+# (upstream softwares.sansa[<genome_version>].{db,g}); sansa_call: the
+# binary/invocation (upstream config[softwares][sansa][call]).
+sansa_db = ""
+sansa_g = ""
+sansa_call = "sansa"
+# svanno: gatk SVAnnotate needs a protein-coding GTF (upstream
+# resources[genome_version].GTF). Empty default = rule never runs.
+svanno_gtf = ""
 # STAR index built inline by STAR_1_pass when missing (upstream ships a
 # pre-built index; the synthetic fixture reference needs its own)
 star_index = "test/fixtures/refs/star_index"

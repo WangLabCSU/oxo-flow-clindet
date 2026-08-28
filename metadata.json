@@ -62,7 +62,7 @@
     "conpair contamination check — custom conpair_latest.sif container",
     "ASCATsc (feeds the BRASS input chain; HMF ASCATsc.R) + multi-lane entry variant (mapping_muliti.smk) — non-default-path variants"
   ],
-  "rule_count": 183,
+  "rule_count": 186,
   "tools": [
     "fastp",
     "bwa (>=0.7.18)",
