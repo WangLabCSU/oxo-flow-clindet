@@ -23,7 +23,7 @@ input = {
     ref = "{config.reference}"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T.txt" ]
-resources = { memory_mb = 1024 }
+resources = { memory = "1G" }
 description = "gatk CollectWgsMetrics tumor (upstream WGS picard_collect_wgs; the GATK wrapper in the gatk4 image, same as the WES picard rules — the bare bioconda `picard` shim misparses the tool args)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
 [rules.environment]
@@ -37,7 +37,7 @@ input = {
     ref = "{config.reference}"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC.txt" ]
-resources = { memory_mb = 1024 }
+resources = { memory = "1G" }
 description = "gatk CollectWgsMetrics normal (upstream WGS picard_collect_wgs)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk CollectWgsMetrics -I {input.bam} -O {output[0]} -R {input.ref}"""
 [rules.environment]
@@ -54,7 +54,7 @@ output = [
     "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.txt",
     "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T-fragment-length.pdf"
 ]
-resources = { memory_mb = 1024 }
+resources = { memory = "1G" }
 description = "picard CollectInsertSizeMetrics tumor (upstream WGS picard_flength_wgs; -H is REQUIRED and needs R — the gatk4 image has no R, so the port runs the bioconda picard from envs/clindet.yaml which bundles R; live-verified)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
 [rules.environment]
@@ -71,7 +71,7 @@ output = [
     "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.txt",
     "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-NC-fragment-length.pdf"
 ]
-resources = { memory_mb = 1024 }
+resources = { memory = "1G" }
 description = "picard CollectInsertSizeMetrics normal (upstream WGS picard_flength_wgs; -H via the R-bundled bioconda picard, live-verified)"
 shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && picard CollectInsertSizeMetrics -I {input.bam} -O {output[0]} -R {input.ref} -H {output[1]} -M 0.5"""
 [rules.environment]
@@ -194,3 +194,63 @@ shell = """svaba run -t {input.Tum} -n {input.NC} -p {threads} -D {input.dbsnp_i
 # upstream runs svaba in its custom svaba.sif; the port pins the bioconda
 # 1.2.0 image (verified present on depot.galaxyproject.org)
 singularity = "https://depot.galaxyproject.org/singularity/svaba%3A1.2.0--h69ac913_1"
+
+# ------------------------------------------------- SV annotation ----
+# sansa-annotation + svanno (issue #7): upstream gates these on the sansa
+# software config being present (softwares.sansa[<genome_version>]) — absent
+# in the upstream repo itself, so the rules are dead code there. The port
+# expresses the same gate as config-key presence: empty sansa_db/sansa_g
+# (and svanno_gtf for SVAnnotate's protein-coding GTF) = the rules never run.
+# Inputs are the port's existing SV producer outputs (svaba somatic sv +
+# delly filter vcf), so DAG edges are plan-time exact matches.
+
+[[rules]]
+name = "SV_sansa_anno_svaba"
+when = "config.run_type == 'wgs' && wildcard.control != '' && config.sansa_db != '' && config.sansa_g != ''"
+input = {
+    vcf = "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.sv.vcf",
+    db = "{config.sansa_db}",
+    g = "{config.sansa_g}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}_SV_anno.bcf",
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}_query.tsv.gz"
+]
+resources = { threads = 2, memory = "4G" }
+description = "sansa-annotate the svaba somatic SV calls (upstream WGS anno_svaba: annotate -i Name -g <gene model> -t 10000; sansa is a site-provided binary upstream too — no pinned image)"
+depends_on = ["SV_svaba"]
+shell = """{config.sansa_call} annotate -i Name -g {input.g} -t 10000 -a {output[0]} -o {output[1]} {input.vcf}"""
+
+[[rules]]
+name = "SV_sansa_annodelly"
+when = "config.run_type == 'wgs' && wildcard.control != '' && config.sansa_db != '' && config.sansa_g != ''"
+input = {
+    vcf = "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_delly_{pair_id}_filter.vcf",
+    db = "{config.sansa_db}",
+    g = "{config.sansa_g}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/SV_anno_{pair_id}.bcf",
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/DELLY/{pair_id}/query_{pair_id}.tsv.gz"
+]
+resources = { threads = 2, memory = "4G" }
+description = "sansa-annotate the DELLY filtered SV calls (upstream WGS SV_sansa_annodelly)"
+depends_on = ["delly_filter"]
+shell = """{config.sansa_call} annotate -i Name -g {input.g} -t 10000 -a {output[0]} -o {output[1]} {input.vcf}"""
+
+[[rules]]
+name = "SV_svanno_svaba"
+when = "config.run_type == 'wgs' && wildcard.control != '' && config.svanno_gtf != ''"
+input = {
+    vcf = "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}.svaba.somatic.sv.vcf",
+    gtf = "{config.svanno_gtf}"
+}
+output = [
+    "{config.output_dir}/{config.genome_version}/results/sv/paired/svaba/{pair_id}/{pair_id}_SVAnnotate.vcf"
+]
+resources = { threads = 1, memory = "4G" }
+description = "gatk SVAnnotate on the svaba somatic SV calls (upstream WGS svanno_svaba; protein-coding GTF)"
+depends_on = ["SV_svaba"]
+shell = """export _JAVA_OPTIONS=-Djava.io.tmpdir={config.java_temp_dir} && gatk SVAnnotate -V {input.vcf} --protein-coding-gtf {input.gtf} -O {output[0]}"""
+[rules.environment]
+singularity = "https://depot.galaxyproject.org/singularity/gatk4%3A4.6.2.0--py310hdfd78af_1"
