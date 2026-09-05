@@ -64,7 +64,7 @@
     "sansa-annotation (SV_sansa_*) + svaba svanno — gated on an upstream sansa config absent from the mini test (svanno additionally needs the GTF, empty in the mini test)",
     "telomerecat — marked 'departed' upstream (workflow/WGS/rules/mapping.smk)"
   ],
-  "rule_count": 186,
+  "rule_count": 188,
   "tools": [
     "fastp",
     "bwa (>=0.7.18)",

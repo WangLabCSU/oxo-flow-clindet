@@ -19,8 +19,9 @@
 #     never vcf2maf'd (same for sage/pave).
 #   - lofreq singularity URL upstream is
 #     .../lofreq:broken---2.5.1--py38h1bd3507_2 — the tag literally contains
-#     "broken---" (Galaxy depot artifact); VERIFY the image resolves during
-#     the live-test cycle, else pin a clean lofreq image.
+#     "broken---" (Galaxy depot artifact), but the image resolves live from
+#     depot.galaxyproject.org (verified 2026-08-22, see lofreq_call_up below);
+#     keep the tag, pin a clean one only if the depot ever drops it.
 #   - Manta/Strelka runWorkflow.py invocations use the DNA-port hardening
 #     (-m local -j {effective_threads} -g 4) instead of upstream's bare call.
 #

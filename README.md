@@ -92,6 +92,20 @@ The samplesheet (`samplesheet.csv`) holds one row per pair:
 tumor-only pair. Requires oxo-flow ≥ 0.16.0 (wildcard-scoped `when`
 predicates, `wildcard.<key>`, landed in v0.16.0 — Traitome/oxo-flow PR #187).
 
+### Limitation: tumor FASTQ paths are shared across pairs
+
+Upstream reads per-sample FASTQ paths from the sample sheet
+(`Tumor_R1_file_path` etc.). The port keeps the FASTQs in `[config]`
+(`tumor_fastq_r1/r2`, `normal_fastq_r1/r2`, `rna_fastq_r1/r2`), so **every
+pair consumes the same literal read files** (`fastp_tumor_sample` in
+`rules/00_common.oxoflow` and `fastp_tumor_sample_unpaired` in
+`rules/70_unpaired.oxoflow` expand over the pairs list but substitute the
+same config path). With a multi-pair sheet like the fixture (mini + mini2),
+all pairs process identical reads. Per-pair reads require either one pair
+per workflow invocation or replacing the config literals with per-pair
+paths (sample-sheet-driven inputs are an oxo-flow engine feature, not
+something a workflow file can express today).
+
 ### RNA default stages (targeted)
 
 The upstream mini-test default stages (`arriba`, `call_mut`) map to explicit
