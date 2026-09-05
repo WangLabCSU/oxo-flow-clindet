@@ -138,6 +138,10 @@ star_index = "test/fixtures/refs/star_index"
 rsem_index = ""
 kallisto_index = ""
 salmon_index = ""
+# RNA SNV callers for the vcf2maf merge tail (upstream
+# run_params.rna_caller_list in mini_test_data/rna/fusion/data/test_rna.yaml;
+# matches the six unrolled vcf2maf_rna_* rules in rules/rna/60_vcf2maf_merge.oxoflow)
+rna_caller_list = ["freebayes", "HaplotypeCaller", "lofreq", "Mutect2", "vardict", "varscan2"]
 # TRUST4 (upstream softwares_params[genome].trust4; git-cloned at rule
 # runtime into trust4_dir when trust4_f is missing — not in default stages)
 trust4_dir = "resources/softwares/TRUST4"

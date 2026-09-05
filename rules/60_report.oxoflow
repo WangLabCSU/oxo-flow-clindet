@@ -36,9 +36,46 @@ input = {
     picard = "{config.output_dir}/{config.genome_version}/results/stats/paired/wes_metrics/{pair_id}-T.txt"
 }
 output = [ "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt" ]
-when = "((config.run_type == 'wes' && wildcard.control != '') || (config.run_type == 'wgs' && wildcard.control != '')) && (config.run_report)"
+when = "(config.run_type == 'wes' && wildcard.control != '') && (config.run_report)"
 description = "collect QC files for MultiQC (upstream prep_multiqc_data, in-scope subset)"
 shell = """printf '%s\\n' "{input.fastp_tum}" "{input.fastp_nc}" "{input.dedup_metrics}" "{input.picard}" > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# WGS split: upstream keeps per-run-type rule files (workflow/WGS/rules/report/
+# multiqc.smk consumes wgs_metrics, not wes_metrics). A single shared prep rule
+# here would execute in wgs mode while demanding a wes_metrics file that only
+# the wes-gated picard rules produce — unproducible at runtime.
+[[rules]]
+name = "prep_multiqc_data_wgs"
+input = {
+    fastp_tum = "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-T-fastp.json",
+    fastp_nc = "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-NC-fastp.json",
+    dedup_metrics = "{config.output_dir}/{config.genome_version}/results/qc/dedup/paired/{pair_id}-T.metrics.txt",
+    picard = "{config.output_dir}/{config.genome_version}/results/stats/paired/wgs_metrics/{pair_id}-T.txt"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt" ]
+when = "(config.run_type == 'wgs' && wildcard.control != '') && (config.run_report)"
+description = "collect QC files for MultiQC, WGS (upstream WGS prep_multiqc_data; wgs_metrics picard input)"
+shell = """printf '%s\\n' "{input.fastp_tum}" "{input.fastp_nc}" "{input.dedup_metrics}" "{input.picard}" > {output[0]}"""
+[rules.environment]
+conda = "envs/clindet.yaml"
+
+# Tumor-only split: the combined gather below expands over config.pairs_list
+# (all pairs), so every pair needs a filelist producer. Tumor-only pairs run
+# the rules/70_unpaired chain (wes only), which has no normal fastp and no
+# picard CollectHsMetrics — prep collects the fastp tumor json + unpaired dedup
+# metrics only (the same in-scope-subset spirit as the paired prep).
+[[rules]]
+name = "prep_multiqc_data_tumor_only"
+input = {
+    fastp_tum = "{config.output_dir}/{config.genome_version}/results/trimmed/fastp/{pair_id}-T-fastp.json",
+    dedup_metrics = "{config.output_dir}/{config.genome_version}/results/qc/dedup/unpaired/{pair_id}-T.metrics.txt"
+}
+output = [ "{config.output_dir}/{config.genome_version}/results/multiqc_data/{pair_id}/filelist.txt" ]
+when = "(config.run_type == 'wes' && wildcard.control == '') && (config.run_report)"
+description = "collect QC files for MultiQC, tumor-only (unpaired chain has no normal/picard inputs)"
+shell = """printf '%s\\n' "{input.fastp_tum}" "{input.dedup_metrics}" > {output[0]}"""
 [rules.environment]
 conda = "envs/clindet.yaml"
 
