@@ -278,3 +278,44 @@ Apache-2.0. Copyright (c) 2026 oxo-flow-community.
 ## Community
 
 https://oxo-flow-community.github.io/
+
+### Remaining upstream rule names by file (all inside the excluded families above; a few have renamed or same-name ported counterparts — see the Fidelity table)
+
+- **workflow/WES/rules/cgp/cgpBattenberg.smk** (1): `battenberg_call`
+- **workflow/WES/rules/rtm/paired/CNV/purple.smk** (1): `paired_purple`
+- **workflow/WES/rules/rtm/paired/SNV/octopus.smk** (3): `octopus_call_paired`, `octopus_paired_germline`, `octopus_paired_somatic`
+- **workflow/WES/rules/rtm/paired/SNV/sage.smk** (1): `sage_germline_filter_pass`
+- **workflow/WES/rules/rtm/unpaired/CNV/purple.smk** (3): `unpaired_amber`, `unpaired_cobalt`, `unpaired_purple`
+- **workflow/WES/rules/rtm/unpaired/SNV/octopus.smk** (1): `octopus_call_tumor_only`
+- **workflow/WES/rules/rtm/unpaired/SNV/pindel.smk** (4): `PI_ggz_unpaired`, `build_unpaired_fake_bam`, `cgppindel_filter_somatic_unpaired`, `unpaired_PI_call`
+- **workflow/WGS/rules/SV.smk** (9): `SV_brass`, `SV_brass_bamstat`, `SV_gridss`, `SV_sansa_merge`, `brass_ascat`, `brass_pre_merge`, `delly_pre_merge`, `jasmine_merge`, `manta_pre_merge`
+- **workflow/WGS/rules/calling_unpaired.smk** (6): `unpaired_call_strelka_somatic`, `unpaired_call_variants_mutect2`, `unpaired_coverageBed`, `unpaired_coverageBed_2`, `unpaired_merge_strelka`, `unpaired_merge_strelka_somatic`
+- **workflow/WGS/rules/cgp/cgppindel.smk** (1): `cgppindel_filter_somatic`
+- **workflow/WGS/rules/merge_loop_germline.smk** (2): `loop_vcf2maf_germ_unpaired`, `merge_unpaired_germ_maf`
+- **workflow/WGS/rules/rtm/paired/CNV/ASCAT.smk** (1): `CNA_ASCAT_sc`
+- **workflow/WGS/rules/rtm/paired/CNV/Battenberg.smk** (3): `CNA_Battenberg_ABSOLUTE_GISTIC`, `CNA_Battenberg_combine`, `CNA_Battenberg_v2`
+- **workflow/WGS/rules/rtm/paired/CNV/ecDNA.smk** (1): `ampliconsuite`
+- **workflow/WGS/rules/rtm/paired/CNV/facets.smk** (2): `CNA_snp_pileup_nor`, `CNA_snp_pileup_tum`
+- **workflow/WGS/rules/rtm/paired/CNV/facets_suite.smk** (4): `facets_annotate_maf`, `facets_calling`, `facets_gene_cna`, `facets_pileup`
+- **workflow/WGS/rules/rtm/paired/CNV/purple.smk** (2): `paired_amber`, `paired_cobalt`
+- **workflow/WGS/rules/rtm/paired/CNV/sequenza.smk** (1): `sequenza_gc_bins`
+- **workflow/WGS/rules/rtm/paired/SNV/DeepVariant.smk** (3): `deepvariant_filter_germline`, `deepvariant_filter_somatic`, `deepvariant_somatic_call`
+- **workflow/WGS/rules/rtm/paired/SNV/UnifiedGenoTyper.smk** (1): `call_variants_UnifiedGenoTyper`
+- **workflow/WGS/rules/rtm/paired/SNV/sage.smk** (2): `paired_sage_germline`, `pave_anno_sage_germline`
+- **workflow/WGS/rules/rtm/paired/SNV/vardict.smk** (1): `vardict_filter_germline`
+- **workflow/WGS/rules/rtm/paired/SV/BRASS.smk** (1): `brass_cnv`
+- **workflow/WGS/rules/rtm/paired/SV/gridss.smk** (2): `SV_gridss_filter`, `gridss_rename_tumor`
+- **workflow/WGS/rules/rtm/paired/SV/jasmine_merge.smk** (2): `gridss_pre_merge`, `svaba_pre_merge`
+- **workflow/WGS/rules/rtm/paired/SV/linx.smk** (2): `paired_linx`, `report_linx`
+- **workflow/WGS/rules/rtm/paired/SV/svaba.smk** (1): `svaba_rename_tumor`
+- **workflow/WGS/rules/rtm/paired/VirusScan.smk** (1): `virusbreakend`
+- **workflow/WGS/rules/rtm/unpaired/CNV.smk** (1): `unpair_CNA_ASCAT_sc`
+- **workflow/WGS/rules/rtm/unpaired/CNV/freec.smk** (3): `freec_call_unpaired`, `plot_freec_unpaired`, `unpair_freec_config`
+- **workflow/WGS/rules/rtm/unpaired/DeepVariant.smk** (1): `deepvariant_call`
+- **workflow/WGS/rules/rtm/unpaired/SNV/deepvariant.smk** (2): `deepvariant_norm`, `unpaird_deepvariant_call`
+- **workflow/WGS/rules/rtm/unpaired/SV.smk** (2): `SV_unp_delly`, `delly_unp_filter`
+- **workflow/WGS/rules/rtm/unpaired/UnifiedGeniTyper.smk** (1): `unpaired_call_variants_UnifiedGenoTyper`
+- **workflow/common/rules/merge_loop.smk** (1): `paired_maf_report`
+- **wrapper/rna.smk** (1): `rna_pipeline`
+- **wrapper/wes.smk** (1): `wes_pipeline`
+- **wrapper/wgs.smk** (1): `wgs_pipeline`
