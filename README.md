@@ -85,7 +85,12 @@ oxo-flow run main.oxoflow -j 8
 
 Upstream also defines `build_b37`/`build_hg38` (reference builders) and
 `pull_zenodo` (data pull) run types — reference-data utilities without a
-mini fixture; not ported (documented).
+mini fixture; not ported (documented). The same rule family covers the
+setup `download_*` (x19), `build_bwa_index`/`build_star_index`/
+`build_kallisto_salmon_index`/`build_rsem_reference`/`rsem_star_index`/
+`kallisto_salmon_index`/`bwa_index`, `create_conda_env`, `mass_config`,
+`prerequisites(build conda env)` and `install_clindet_extras` rules —
+all zero-coverage here.
 
 The samplesheet (`samplesheet.csv`) holds one row per pair:
 `pair_id,experiment,control,experiment_type` — leave `control` empty for a
