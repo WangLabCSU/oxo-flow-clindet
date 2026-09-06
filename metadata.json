@@ -44,7 +44,7 @@
     "isofox",
     "bqsr"
   ],
-  "description": "Port of zyllifeworld/clindet in its upstream single-Snakefile form: one entry file, config run_type (wes|wgs|rna) selects the rule tree, and paired vs tumor-only WES is derived PER PAIR from the sample sheet (a pair without a control runs the tumor-only tree — engine wildcard-scoped when predicates). 183 rules: somatic SNV (Mutect2, VarDict, VarScan2, MuSE, HaplotypeCaller) + germline (Strelka2+Manta, CaVEMan); tumor-only callers (Mutect2/HaplotypeCaller/varscan2/Strelka/vardict/lofreq/freebayes); CNV subset (Control-FREEC, Sequenza, ExomeDepth, ASCAT); WGS SV (delly chain incl. germ, svaba, Manta somaticSV); opt-in BQSR; vcf2maf/VEP MAF annotation, region flagging, cancer report, MultiQC; RNA fusion/expression (arriba/TRUST4/isofox). Live-verified per run type on tx-ubuntu.",
+  "description": "Port of zyllifeworld/clindet in its upstream single-Snakefile form: one entry file, config run_type (wes|wgs|rna) selects the rule tree, and paired vs tumor-only WES is derived PER PAIR from the sample sheet (a pair without a control runs the tumor-only tree — engine wildcard-scoped when predicates). 188 rules: somatic SNV (Mutect2, VarDict, VarScan2, MuSE, HaplotypeCaller) + germline (Strelka2+Manta, CaVEMan); tumor-only callers (Mutect2/HaplotypeCaller/varscan2/Strelka/vardict/lofreq/freebayes); CNV subset (Control-FREEC, Sequenza, ExomeDepth, ASCAT); WGS SV (delly chain incl. germ, svaba, Manta somaticSV); opt-in BQSR; vcf2maf/VEP MAF annotation, region flagging, cancer report, MultiQC; RNA fusion/expression (arriba/TRUST4/isofox). Live-verified per run type on tx-ubuntu.",
   "scope": [
     "wes (run_type=wes, default): paired WES tree for pairs with a control + tumor-only WES tree for pairs without (fastp, bwa+GATK mapping/markdup, opt-in BQSR, 5 somatic SNV callers, Strelka2/Manta/CaVEMan germline, vcf2maf/VEP MAF, region flagging, cancer report, MultiQC)",
     "wgs (run_type=wgs): WGS metrics, the paired callers with WGS config, delly SV chain (call/filter/to_vcf/germ/delly2bnd), svaba, Manta somaticSV",
@@ -54,15 +54,19 @@
   ],
   "excluded": [
     "CNV: purple/amber/cobalt/FACETS — HMF/Sanger custom containers (hmftools.sif, facets-suite image) + multi-GB hmf_pipeline_resources / snp-pileup PoN trees built via the upstream pull_zenodo run type; unpaired CNV (freec/purple) also not ported — the ported CNV gate is paired-only; the conda-portable subset freec/sequenza/exomedepth/ASCAT IS ported and live-verified",
-    "CNV: SM_check / CNA_ABSOLUTE_GISTIC / CNA_Battenberg — marked 'for future development' upstream (workflow/WES/rules/rtm/paired/CNV.smk comment); ABSOLUTE/GISTIC2 are Broad tools without conda packages, Battenberg needs the cgpbattenberg sif + 1000G impute reference data",
-    "SV: gridss/BRASS/linx/igcaller/jasmine — upstream custom sifs (gridss 2.13.2, brass634, linx, jasminesv) or hardcoded local software paths (/public/ClinicalExam/...) plus Sanger/HMF reference trees; delly/svaba/Manta ARE ported",
-    "unpaired-mode callers beyond the seven portable ones (sage/deepvariant/pindel/octopus/UnifiedGeniTyper — custom containers) + WGS Battenberg/ecDNA/VirusScan (custom containers + resource trees)",
+    "CNV: SM_check / CNA_ABSOLUTE_GISTIC / CNA_Battenberg — marked 'for future development' upstream (workflow/WES/rules/rtm/paired/CNV.smk comment); ABSOLUTE/GISTIC2 are Broad tools without conda packages (same family: WGS ASCAT_GISTIC), Battenberg needs the cgpbattenberg sif + 1000G impute reference data",
+    "SV: gridss/BRASS/linx/igcaller/jasmine — upstream custom sifs (gridss 2.13.2, brass634, linx, jasminesv) or hardcoded local software paths (/public/ClinicalExam/...) plus Sanger/HMF reference trees (the merge chain continues into SV_merge_final — bcftools filter SUPP>=2); delly/svaba/Manta ARE ported",
+    "unpaired-mode callers beyond the seven portable ones (note: some of these tools do have paired variants upstream — pindel cgppindel PI_ggz, deepvariant WES/WGS SNV/DeepVariant.smk, sage — the exclusion covers their custom containers either way) (sage/deepvariant/pindel/octopus/UnifiedGeniTyper — custom containers) + WGS Battenberg/ecDNA/VirusScan (custom containers + resource trees)",
     "conpair contamination check — custom conpair_latest.sif container",
-    "ASCATsc (feeds the BRASS input chain; HMF ASCATsc.R) + multi-lane entry variant (mapping_muliti.smk) — non-default-path variants"
+    "ASCATsc (feeds the BRASS input chain; HMF ASCATsc.R) + multi-lane entry variant (mapping_muliti.smk) — non-default-path variants",
+    "Mutect2 PoN build chain (upstream WGS SNV/Mutect2_pon.smk: pon_GB / pon_facetsCH / M2_CSPN / call_variants_pon) — not ported; the port consumes a configured `-pon` only and does not build PoN databases (facets inputs are excluded anyway)",
+    "CNV/SV/QC callers not ported: BIC-seq2 (WES bicseq2.smk + WGS bicseq.smk), esvee (WGS SV/esvee.smk), lumpy (WGS SV/lumpy.smk), sentieon WGS paired caller (WGS SNV/sentieon.smk; the RNA-side sentieon chain is already noted in the port), lancet2 (WES SNV/Lancet2.smk — off-default like the others), moalmanac + split_maf_snp_indel (common case_report.smk — downstream of the excluded facets/ASCAT CNV), orange + bamMetrics WGS report (report/orange.smk — downstream of purple/linx), ngs_bit QC (common qc.smk: 145), summary_softwares version grid (common summary_softwares.smk; the port substitutes conda env versions in MultiQC)",
+    "Reference-data/setup rule family (upstream setup/* download_* x19, build_b37_ref / build_hg38_ref / build_bwa_index / build_star_index / rsem_star_index etc.) — the README records the concept (reference-data utilities without a mini fixture, not ported); these rule names are not individually listed upstream-side documents — see the README setup note"
   ],
   "not_applicable": [
     "sansa-annotation (SV_sansa_*) + svaba svanno — gated on an upstream sansa config absent from the mini test (svanno additionally needs the GTF, empty in the mini test)",
-    "telomerecat — marked 'departed' upstream (workflow/WGS/rules/mapping.smk)"
+    "telomerecat — marked 'departed' upstream (workflow/WGS/rules/mapping.smk)",
+    "WES rules/filtering.smk select_calls / hard_filter_calls / recalibrate_calls / merge_calls — upstream dead chain (the `results/genotyped/all.vcf.gz` input has no producer in the tree), so nothing to port"
   ],
   "rule_count": 188,
   "tools": [
