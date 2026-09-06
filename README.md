@@ -224,7 +224,22 @@ version `582a9131` (MIT). Created 2026-08-15; this workflow **may lag
 upstream releases**. Attribution in `NOTICE.md`; upstream license in
 `LICENSE.upstream`.
 
-## Test
+#
+## Not ported (per-rule, upstream family list)
+
+- **Mutect2 PoN build chain (M2_CSPN/pon_GB/pon_facetsCH/call_variants_pon)** (`workflow/WGS/rules/rtm/paired/SNV/Mutect2_pon.smk`/`workflow/WES/rules/rtm/paired/SNV/Mutect2_pon.smk`): `M2_CSPN`, `M2_SNC`, `M2_ST`, `M2_contam`, `M2_filter`, `call_variants_pon`, `mutect2`, `pon_GB`
+- **BIC-seq2** (`workflow/WES/rules/rtm/paired/CNV/bicseq2.smk`/`workflow/WGS/rules/rtm/paired/CNV/bicseq.smk`): `bicseq`, `bicseq2_norm`, `bicseq2_samtools_normal`, `bicseq2_samtools_tumor`, `bicseq2_seg`
+- **esvee** (`workflow/WGS/rules/rtm/paired/SV/esvee.smk`): `esvee_prep`
+- **lumpy** (`workflow/WGS/rules/rtm/paired/SV/lumpy.smk`): `extract_lumpy_evidence`, `lumpy_call_paired`, `lumpy_svtyper_paired`
+- **sentieon (WGS paired)** (`workflow/WGS/rules/rtm/paired/SNV/sentieon.smk`): `call_variants_sentieon`, `filter_sentieon`
+- **lancet2** (`workflow/WES/rules/rtm/paired/SNV/Lancet2.smk`): `lancet2_somatic_call`
+- **moalmanac + split_maf_snp_indel** (`workflow/common/rules/case_report.smk`): `moalmanac_annotation`, `split_maf_snp_indel`
+- **orange / bamMetrics (WGS report)** (`workflow/WGS/rules/report/orange.smk`): `bamMetrics_tumor`, `orange`
+- **ngs_bit QC** (`workflow/common/rules/qc.smk`): `ngs_bit_mapping`, `ngs_bit_sample_gender`
+- **summary_softwares** (`workflow/common/rules/summary_softwares.smk`): `clindet_hmftool_version`, `clindet_main_version`, `clindet_rsem_version`, `clindet_vep_version`
+- **setup reference-data family** (`workflow/setup/*`): `build_b37_ref`, `build_bwa_index`, `build_hg38_ref`, `build_kallisto_salmon_index`, `build_rsem_reference`, `build_star_index`, `bwa_index`, `create_conda_env`, `download_ascat`, `download_ascat_refdata`, `download_b37_gatk`, `download_b37_hmftools`, `download_b37_reference`, `download_cdna`, `download_cdna_fasta`, `download_ensembl_gff3`, `download_gatk_resources`, `download_gatk_software`, `download_grch37_gff3`, `download_grch37_gtf`, `download_gtf`, `download_hg38_genome`, `download_hmftools`, `download_mutation_anno_bed_b37`, `download_mutation_anno_bed_hg38`, `download_rna_edit_vcf`, `download_sanger`, `download_sanger_refdata`, `download_vep_cache`, `download_vep_cache_hg38`, `download_zenodo_containers`, `install_clindet_extras`, `kallisto_salmon_index`, `mass_config`, `prerequisites`, `rsem_star_index`, `star_index`
+
+# Test
 
 ```bash
 bash test/run.sh      # DNA: validate + lint + dry-run, exits 0
