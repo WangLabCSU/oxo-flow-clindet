@@ -22,7 +22,7 @@ for ARGS in "" "--arg run_type=wgs" "--arg run_type=rna"; do
   LABEL=${ARGS:-default-wes}
   echo "==> [$LABEL] dry-run"
   "$OXO" dry-run main.oxoflow $ARGS > /tmp/oxo-dryrun-$$.txt 2>&1
-  grep -q "would execute" /tmp/oxo-dryrun-$$.txt
+  grep -q "would run:" /tmp/oxo-dryrun-$$.txt
 done
 
 echo "PASS"
