@@ -22,7 +22,9 @@ for ARGS in "" "--arg run_type=wgs" "--arg run_type=rna"; do
   LABEL=${ARGS:-default-wes}
   echo "==> [$LABEL] dry-run"
   "$OXO" dry-run main.oxoflow $ARGS > /tmp/oxo-dryrun-$$.txt 2>&1
-  grep -q "would run:" /tmp/oxo-dryrun-$$.txt
+  # v0.16.0 prints "DAG: (dry-run) N rules would execute";
+  # post-v0.20.0 main prints "Plan: would run: N | skip: M | completed: K".
+  grep -qE "would (execute|run:)" /tmp/oxo-dryrun-$$.txt
 done
 
 echo "PASS"

@@ -27,6 +27,8 @@ echo "==> lint (warnings are acceptable, errors are not)"
 
 echo "==> dry-run with the upstream default stages"
 "$OXO" dry-run main.oxoflow --arg run_type=rna "${TARGETS[@]}" > /tmp/oxo-dryrun-rna-$$.txt 2>&1
-grep -q "would run:" /tmp/oxo-dryrun-rna-$$.txt
+# Same headline-tolerance as run.sh: old engines say "would execute",
+# new ones say "would run:".
+grep -qE "would (execute|run:)" /tmp/oxo-dryrun-rna-$$.txt
 
 echo "PASS"
